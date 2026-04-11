@@ -1121,7 +1121,10 @@ function populateCalcCategories() {
     const sel = document.getElementById('calc-cat-select');
     if (!sel) return;
     const items = loadData('vente');
-    const categories = [...new Set(items.map(i => i.category || 'Général'))].filter(c => c && !c.includes('Cuisson'));
+    const standardCategories = ['📦 Matériaux', '🛡️ Armures', '⚔️ Outils', '✨ Livres', '🧶 Divers'];
+    const existingCategories = items.map(i => i.category || '🧶 Divers');
+    
+    const categories = [...new Set([...standardCategories, ...existingCategories])].filter(c => c && !c.includes('Cuisson'));
     
     sel.innerHTML = '<option value="all">📂 Toutes les catégories</option>';
     categories.sort().forEach(c => {
@@ -1135,7 +1138,7 @@ function populateMaterialSelects() {
     
     let items = loadData('vente');
     if (selectedCat !== 'all') {
-        items = items.filter(m => m.category === selectedCat);
+        items = items.filter(m => (m.category || '🧶 Divers') === selectedCat);
     }
     
     const sel = document.getElementById('calc-mat-select');
