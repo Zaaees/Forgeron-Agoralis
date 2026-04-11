@@ -172,11 +172,19 @@
 
             <div class="card">
 
-                <div class="form-group">
-                    <label>Remplir depuis un matériau (optionnel)</label>
-                    <select id="calc-mat-select" onchange="fillCalcFromMaterial()">
-                        <option value="">— Sélectionner un matériau —</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>📂 Catégorie du catalogue</label>
+                        <select id="calc-cat-select" onchange="populateMaterialSelects()">
+                            <option value="all">📂 Toutes les catégories</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🏷️ Article du catalogue</label>
+                        <select id="calc-mat-select" onchange="fillCalcFromMaterial()">
+                            <option value="">— Sélectionner un article —</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-row">
@@ -275,9 +283,20 @@
                 <div class="card-title">⚡ Calcul XP — Fusion & Réparation</div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Objet à Réparer / Fusionner (Optionnel)</label>
-                        <input type="text" id="xp-base-item-input" list="xp-base-item-list" placeholder="Ex: Plastron en Diamant, Épée..." onchange="onXpBaseItemChange()">
-                        <datalist id="xp-base-item-list"></datalist>
+                        <label>🛠️ Matériau</label>
+                        <select id="xp-cat-select" onchange="populateXpItems()">
+                            <option value="all">📂 Tous les matériaux</option>
+                            <option value="Fer">Fer</option>
+                            <option value="Diamant">Diamant</option>
+                            <option value="Or">Or</option>
+                            <option value="Netherite">Netherite</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>⚔️ Objet à Réparer / Fusionner</label>
+                        <select id="xp-base-item-input" onchange="onXpBaseItemChange()">
+                            <option value="">— Sélectionner un objet —</option>
+                        </select>
                         <input type="hidden" id="xp-base-mat-price" value="0">
                     </div>
                 </div>

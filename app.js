@@ -240,8 +240,8 @@ function runCalc() {
 
 function updateProfit(unitPrice, qty) {
     const profitBox = document.getElementById('calc-profit-box');
-    const mats = loadData('vente').filter(m => m.category === '📦 Matériaux' || m.category === 'Minerais');
-    const mat = mats.find(m => m.id === selectedMaterialId);
+    const allItems = loadData('vente');
+    const mat = allItems.find(m => m.id === selectedMaterialId);
     if (!mat || !mat.sellPrice || mat.sellPrice <= 0) { profitBox.style.display = 'none'; return; }
     
     const profitPerUnit = mat.sellPrice - unitPrice;
@@ -258,13 +258,15 @@ function updateProfit(unitPrice, qty) {
 
 function fillCalcFromMaterial() {
     const sel = document.getElementById('calc-mat-select');
-    const matId = parseInt(sel.value);
-    if (!matId) { selectedMaterialId = null; runCalc(); return; }
+    if (!sel || !sel.value) { selectedMaterialId = null; runCalc(); return; }
+    
+    const matId = Number(sel.value);
     selectedMaterialId = matId;
-    const mats = loadData('vente').filter(m => m.category === '📦 Matériaux' || m.category === 'Minerais');
-    const mat = mats.find(m => m.id === matId);
-    if (mat && mat.price) {
-        document.getElementById('calc-unit').value = mat.price;
+    const allItems = loadData('vente');
+    const mat = allItems.find(m => m.id === matId);
+    
+    if (mat) {
+        document.getElementById('calc-unit').value = mat.price !== undefined ? mat.price : 0;
         runCalc();
     }
 }
@@ -279,9 +281,9 @@ function addCalcLine() {
     if (numVal <= 0) { showToast('Aucun résultat à ajouter', '⚠️'); return; }
 
     // Build description
-    const mats = loadData('vente').filter(m => m.category === '📦 Matériaux' || m.category === 'Minerais');
+    const mats = loadData('vente');
     const sel = document.getElementById('calc-mat-select');
-    const matId = parseInt(sel.value);
+    const matId = Number(sel.value);
     const mat = matId ? mats.find(m => m.id === matId) : null;
     let desc = '';
     const unitPrice = document.getElementById('calc-unit').value;
@@ -472,17 +474,45 @@ function calcXP() {
 }
 
 function populateXpItems() {
-    const datalist = document.getElementById('xp-base-item-list');
-    if (!datalist) return;
-    const items = loadData('vente');
+    const matSel = document.getElementById('xp-cat-select');
+    const itemSel = document.getElementById('xp-base-item-input');
+    if (!matSel || !itemSel) return;
     
-    const validItems = items.filter(i => {
+    const selectedMat = matSel.value;
+    const allItems = loadData('vente');
+    
+    let filtered = allItems.filter(i => {
         const cat = (i.category || '').toLowerCase();
-        return cat.includes('armure') || cat.includes('outil');
+        const name = (i.name || '').toLowerCase();
+        const isTargetCat = (cat.includes('armure') || cat.includes('outil') || name.includes('canne'));
+        if (!isTargetCat) return false;
+        
+        if (selectedMat !== 'all') {
+            // Check for material in name
+            return name.includes(selectedMat.toLowerCase());
+        }
+        return true;
     });
 
-    const uniqueNames = [...new Set(validItems.map(i => i.name))];
-    datalist.innerHTML = uniqueNames.map(name => `<option value="${escHtml(name)}">`).join('');
+    // Custom sorting: Tools (Outils) first, then Armor (Armures)
+    filtered.sort((a, b) => {
+        const catA = (a.category || '').toLowerCase();
+        const catB = (b.category || '').toLowerCase();
+        const isToolA = catA.includes('outil') || a.name.toLowerCase().includes('canne');
+        const isToolB = catB.includes('outil') || b.name.toLowerCase().includes('canne');
+        
+        if (isToolA && !isToolB) return -1;
+        if (!isToolA && isToolB) return 1;
+        
+        return a.name.localeCompare(b.name);
+    });
+
+    const currentVal = itemSel.value;
+    itemSel.innerHTML = '<option value="">— Sélectionner un objet —</option>';
+    filtered.forEach(item => {
+        itemSel.innerHTML += `<option value="${escHtml(item.name)}">${escHtml(item.name)}</option>`;
+    });
+    if (currentVal) itemSel.value = currentVal;
 }
 
 function onXpBaseItemChange() {
@@ -638,7 +668,9 @@ function saveVenteItem() {
     }
     saveData('vente', items);
     renderVente();
+    populateCalcCategories();
     populateMaterialSelects();
+    populateXpItems();
     closeVenteModal();
     showToast(editingVenteId ? 'Article modifié' : 'Article ajouté', '🏪');
 }
@@ -648,6 +680,9 @@ function deleteVenteItem(id) {
     const items = loadData('vente').filter(i => i.id !== id);
     saveData('vente', items);
     renderVente();
+    populateCalcCategories();
+    populateMaterialSelects();
+    populateXpItems();
     showToast('Article supprimé', '🗑️');
 }
 
@@ -1082,14 +1117,33 @@ function closeEmojiPickerOnClickOutside(e) {
 }
 
 
+function populateCalcCategories() {
+    const sel = document.getElementById('calc-cat-select');
+    if (!sel) return;
+    const items = loadData('vente');
+    const categories = [...new Set(items.map(i => i.category || 'Général'))].filter(c => c && !c.includes('Cuisson'));
+    
+    sel.innerHTML = '<option value="all">📂 Toutes les catégories</option>';
+    categories.sort().forEach(c => {
+        sel.innerHTML += `<option value="${escHtml(c)}">${escHtml(c)}</option>`;
+    });
+}
+
 function populateMaterialSelects() {
-    const mats = loadData('vente').filter(m => m.category === '📦 Matériaux' || m.category === 'Minerais');
+    const catSel = document.getElementById('calc-cat-select');
+    const selectedCat = catSel ? catSel.value : 'all';
+    
+    let items = loadData('vente');
+    if (selectedCat !== 'all') {
+        items = items.filter(m => m.category === selectedCat);
+    }
+    
     const sel = document.getElementById('calc-mat-select');
     if (!sel) return;
     const currentVal = sel.value;
-    sel.innerHTML = '<option value="">— Sélectionner un matériau —</option>';
-    mats.forEach(m => {
-        sel.innerHTML += `<option value="${m.id}">${m.icon || '📦'} ${escHtml(m.name)} (${fmt(m.price)}€/u)</option>`;
+    sel.innerHTML = '<option value="">— Sélectionner un article —</option>';
+    items.sort((a,b) => a.name.localeCompare(b.name)).forEach(m => {
+        sel.innerHTML += `<option value="${m.id}">${m.icon || '📦'} ${escHtml(m.name)}</option>`;
     });
     if (currentVal) sel.value = currentVal;
 }
@@ -1354,7 +1408,7 @@ function initAppListeners() {
         input.addEventListener('wheel', (e) => {
             if (input.readOnly) return;
             e.preventDefault();
-            const step = parseFloat(input.step) || 1;
+            const step = 1;
             const min = parseFloat(input.min);
             const max = parseFloat(input.max);
             let val = parseFloat(input.value) || 0;
@@ -1414,6 +1468,7 @@ function finishAppBoot() {
     calcSmelt();
     renderNotes();
     renderVente();
+    populateCalcCategories();
     populateMaterialSelects();
     populateXpItems();
     calcAnvilWear();
