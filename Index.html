@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Le Forgeron sans Enclume</title>
+    <meta name="description" content="Outils utiles pour les Forgerons, fait par Zaaees :)">
+    
+    <!-- Open Graph / Discord -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://forgerons-agoralis.firebaseapp.com/">
+    <meta property="og:title" content="Le Forgeron sans Enclume">
+    <meta property="og:description" content="Outils utiles pour les Forgerons, fait par Zaaees :)">
+    <meta property="og:image" content="assets/bg_achats.png">
+    <meta name="theme-color" content="#60a5fa">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { transition: background-image 0.5s ease; background-size: cover; background-position: center; background-attachment: fixed; }
+        body[data-tab="vente"] { background-image: linear-gradient(to right, rgba(10,12,16,0.95) 15%, rgba(10,12,16,0.65)), url('assets/bg_vente.png'); }
+        body[data-tab="calc"] { background-image: linear-gradient(to right, rgba(10,12,16,0.95) 15%, rgba(10,12,16,0.65)), url('assets/bg_achats.png'); }
+        body[data-tab="forge"] { background-image: linear-gradient(to right, rgba(10,12,16,0.95) 15%, rgba(10,12,16,0.65)), url('assets/bg_forge.png'); }
+        body[data-tab="enchantement"] { background-image: linear-gradient(to right, rgba(10,12,16,0.95) 15%, rgba(10,12,16,0.65)), url('assets/bg_enchant.png'); }
+        body[data-tab="smelting"] { background-image: linear-gradient(to right, rgba(10,12,16,0.95) 15%, rgba(10,12,16,0.65)), url('assets/bg_smelt.png'); }
+        body[data-tab="notes"] { background-image: linear-gradient(to right, rgba(10,12,16,0.95) 15%, rgba(10,12,16,0.65)), url('assets/bg_notes.png'); }
+        body[data-tab="auth"] { background-image: linear-gradient(to bottom, rgba(10,12,16,0.85), rgba(10,12,16,0.95)), url('assets/bg_achats.png'); }
+    </style>
+    
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="particles"></div>
+
+    <!-- AUTHENTICATION OVERLAY -->
+    <div class="auth-overlay active" id="auth-overlay">
+        <div class="auth-box" id="login-box">
+            <div class="sidebar-logo" style="text-align: center; margin-bottom: 2rem;">
+                <h1 style="font-size: 2.5rem; justify-content: center;">⚜ Agoralis</h1>
+                <div class="tagline">Connexion au Portail</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Pseudo Minecraft</label>
+                <input type="text" id="login-pseudo" placeholder="Ex: Notch" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Code PIN (4 chiffres)</label>
+                <input type="password" id="login-pin" placeholder="••••" maxlength="4" style="letter-spacing: 0.5em; text-align: center; font-size: 1.5rem;">
+            </div>
+            
+            <button class="btn btn-gold" style="width: 100%; padding: 1rem; margin-top: 1rem; font-size: 1.1rem; justify-content: center;" onclick="handleLogin()" id="btn-login">S'authentifier</button>
+            <div class="auth-switch">Vous n'avez pas de compte ? <a href="#" onclick="switchAuthMode('register')">Créer un compte</a></div>
+        </div>
+
+        <div class="auth-box hidden" id="register-box">
+            <div class="sidebar-logo" style="text-align: center; margin-bottom: 1.5rem;">
+                <h1 style="font-size: 2.2rem; justify-content: center;">⚜ Agoralis</h1>
+                <div class="tagline">Créer un compte</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Pseudo Minecraft</label>
+                <input type="text" id="register-pseudo" placeholder="Ex: Jeb" autocomplete="off">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Code PIN (4 chiffres)</label>
+                    <input type="password" id="register-pin" placeholder="••••" maxlength="4" style="text-align: center; font-size: 1.2rem;">
+                </div>
+                <div class="form-group">
+                    <label>Confirmer PIN</label>
+                    <input type="password" id="register-pin-confirm" placeholder="••••" maxlength="4" style="text-align: center; font-size: 1.2rem;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Spécialisation</label>
+                <div class="role-selector">
+                    <div class="role-option" data-role="enchant" onclick="selectRole('enchant')">
+                        <div class="role-icon">✨</div>
+                        <div class="role-name">Enchanteur</div>
+                    </div>
+                    <div class="role-option" data-role="forge" onclick="selectRole('forge')">
+                        <div class="role-icon">⚡</div>
+                        <div class="role-name">Forgeron</div>
+                    </div>
+                </div>
+                <input type="hidden" id="register-role" value="">
+            </div>
+            
+            <button class="btn btn-gold" style="width: 100%; padding: 1rem; margin-top: 1rem; font-size: 1.1rem; justify-content: center;" onclick="handleRegister()" id="btn-register">S'inscrire</button>
+            <div class="auth-switch">Déjà Forgeron ou Enchanteur ? <a href="#" onclick="switchAuthMode('login')">Se connecter</a></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="app-wrapper" style="display: none;">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <h1>⚜ Agoralis</h1>
+            <div class="tagline">Optimisation Commerciale</div>
+        </div>
+        <div class="sidebar-nav">
+            <div class="nav-item active" data-tab="calc">
+                <span class="nav-icon">💰</span>
+                <span class="nav-label">Achats/Ventes</span>
+            </div>
+            <div class="nav-item" data-tab="forge">
+                <span class="nav-icon">⚡</span>
+                <span class="nav-label">Réparation/Fusion</span>
+            </div>
+            <div class="nav-item" data-tab="enchantement">
+                <span class="nav-icon">✨</span>
+                <span class="nav-label">Enchantements</span>
+            </div>
+            <div class="nav-item" data-tab="smelting">
+                <span class="nav-icon">🔥</span>
+                <span class="nav-label">Optimisation Cuisson</span>
+            </div>
+            <div class="nav-item" data-tab="vente">
+                <span class="nav-icon">📖</span>
+                <span class="nav-label">Catalogue</span>
+            </div>
+            <div class="nav-item" data-tab="notes">
+                <span class="nav-icon">📒</span>
+                <span class="nav-label">Notes</span>
+            </div>
+            <div class="nav-item id-admin-only" data-tab="admin" style="display:none; border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 1rem;">
+                <span class="nav-icon">👑</span>
+                <span class="nav-label">Administration</span>
+            </div>
+            <div class="nav-item" id="nav-logout" onclick="handleLogout()" style="margin-top:auto; color:var(--accent-red)">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-label">Déconnexion</span>
+            </div>
+
+        </div>
+        <div class="sidebar-footer" id="sidebar-user-info" style="padding: 1rem; text-align: center; border-top: 1px solid var(--border); margin-bottom: 0.5rem;">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">Connecté en tant que</div>
+            <div id="logged-in-user" style="font-weight: 600; color: var(--gold); font-size: 1.1rem;">-</div>
+        </div>
+        <div class="sidebar-footer" style="border-top: none;">
+            <button class="theme-toggle" id="theme-toggle">
+                <span>🌙 Thème</span>
+                <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- IMPERSONATION BANNER -->
+        <div id="impersonation-banner" class="impersonation-banner" style="display:none;">
+            <div class="banner-content">
+                <span class="banner-icon">👁️</span>
+                <span>Vous regardez actuellement le compte de <strong id="impersonated-user-name">-</strong></span>
+                <button class="btn btn-sm btn-gold" onclick="stopImpersonating()" style="margin-left: 1.5rem;">Retourner sur mon compte</button>
+            </div>
+        </div>
+
+        <!-- ===== ACHAT MATÉRIAUX (ex-Calculateur) ===== -->
+        <div class="section active" id="section-calc">
+            <div class="page-header">
+                <h2>💰 Achats/Ventes</h2>
+                <p>Optimisez vos achats et vos ventes d'items en un clin d'œil</p>
+            </div>
+
+            <div class="card">
+
+                <div class="form-group">
+                    <label>Remplir depuis un matériau (optionnel)</label>
+                    <select id="calc-mat-select" onchange="fillCalcFromMaterial()">
+                        <option value="">— Sélectionner un matériau —</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group calc-field" id="field-unit-price">
+                        <label>Prix unitaire (€)</label>
+                        <input type="number" id="calc-unit" min="0" step="0.01" placeholder="Prix par item">
+                    </div>
+                    <div class="form-group calc-field" id="field-quantity">
+                        <label id="calc-qty-label">Quantité (items)</label>
+                        <div style="display:flex;gap:8px;align-items:stretch">
+                            <input type="number" id="calc-qty" min="0" placeholder="Nombre d'items" style="flex:1">
+                            <select id="calc-qty-unit" onchange="onQtyUnitChange()" style="width:auto;min-width:140px;padding:0.6rem 0.8rem" title="Unité de quantité">
+                                <option value="items">📦 Items</option>
+                                <option value="stacks">🧱 Stacks</option>
+                                <option value="blocs">🟫 Blocs (×9)</option>
+                                <option value="sblocs">🏠 Stacks de blocs</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group calc-field" id="field-budget" style="display:none">
+                        <label>Budget / Prix total (€)</label>
+                        <input type="number" id="calc-budget" min="0" step="0.01" placeholder="Montant total">
+                    </div>
+                </div>
+
+                <div class="result-box">
+                    <div class="result-label">Résultat</div>
+                    <div class="result-value" id="calc-result-value">—</div>
+                    <div class="result-sub" id="calc-result-sub"></div>
+                    <div class="result-actions">
+                        <button class="btn" id="calc-copy-val" data-copy="true" data-value="">📋 Copier</button>
+                        <button class="btn btn-gold" id="calc-add-line" onclick="addCalcLine()">🛒 Ajouter au panier</button>
+                    </div>
+                </div>
+
+                <div class="result-box" id="calc-profit-box" style="display:none;margin-top:1rem">
+                    <div class="result-label">💰 Profit</div>
+                    <div class="result-value" id="calc-profit-value" style="color:var(--accent-green)"></div>
+                    <div class="result-sub" id="calc-profit-sub"></div>
+                    <div class="result-actions">
+                        <button class="btn" id="calc-profit-copy" onclick="copyValue(this.dataset.value)" data-value="">📋 Copier le profit</button>
+                    </div>
+                </div>
+
+                <!-- PANIER / MULTI-ITEMS -->
+                <div class="calc-cart" id="calc-cart" style="display:none">
+                    <div class="cart-header">
+                        <div class="card-title" style="margin-bottom:0">🛒 Panier de calculs</div>
+                        <button class="btn btn-sm btn-danger" onclick="clearCalcCart()">🗑️ Vider</button>
+                    </div>
+                    <div class="cart-lines" id="calc-cart-lines"></div>
+                    <div class="cart-total">
+                        <div class="cart-total-label">TOTAL PANIER</div>
+                        <div class="cart-total-value" id="calc-cart-total">0.00<span class="unit">€</span></div>
+                        <div class="cart-total-sub" id="calc-cart-count">0 articles</div>
+                        <div class="result-actions" style="margin-top:0.8rem">
+                            <button class="btn" onclick="copyValue(document.getElementById('calc-cart-total-raw').value)">📋 Copier le total</button>
+                            <input type="hidden" id="calc-cart-total-raw" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== NOTES ===== -->
+        <div class="section" id="section-notes">
+            <div class="page-header">
+                <h2>📒 Carnet de Notes</h2>
+                <p>Gérez vos transactions et affaires en cours</p>
+            </div>
+
+            <div class="notes-header">
+                <div class="tag-filters">
+                    <span class="tag tag-all active" data-tag="all" onclick="setNoteFilter('all')">Tout</span>
+                    <span class="tag tag-encours" data-tag="encours" onclick="setNoteFilter('encours')">En cours</span>
+                    <span class="tag tag-attente" data-tag="attente" onclick="setNoteFilter('attente')">En attente</span>
+                    <span class="tag tag-termine" data-tag="termine" onclick="setNoteFilter('termine')">Terminé</span>
+                    <span class="tag tag-urgent" data-tag="urgent" onclick="setNoteFilter('urgent')">Urgent</span>
+                </div>
+                <button class="btn btn-gold" onclick="openNoteModal()">+ Nouvelle note</button>
+            </div>
+
+            <div class="notes-list" id="notes-list">
+                <div class="note-empty">📜 Aucune note pour le moment...</div>
+            </div>
+        </div>
+
+        <!-- ===== RÉPARATION / FUSION (ex-Forge) ===== -->
+        <div class="section" id="section-forge">
+            <div class="page-header">
+                <h2>⚡ Réparation / Fusion</h2>
+                <p>Calculez vos prix de fusion et réparation à l'enclume</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">⚡ Calcul XP — Fusion & Réparation</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Objet à Réparer / Fusionner (Optionnel)</label>
+                        <input type="text" id="xp-base-item-input" list="xp-base-item-list" placeholder="Ex: Plastron en Diamant, Épée..." onchange="onXpBaseItemChange()">
+                        <datalist id="xp-base-item-list"></datalist>
+                        <input type="hidden" id="xp-base-mat-price" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Niveau souhaité</label>
+                        <input type="number" id="xp-niv" min="0" value="1" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Multiplicateur (Réparation:2 | Fusion:3)</label>
+                        <input type="number" id="xp-mult" min="0" step="1" value="3">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Usure Enclume (€) — calculé automatiquement</label>
+                        <input type="number" id="xp-mat" min="0" value="0" step="0.01" readonly style="opacity:0.7;cursor:not-allowed">
+                    </div>
+                    <div class="form-group">
+                        <label>Passages enclume (×)</label>
+                        <input type="number" id="xp-anvil-mult" min="0" value="1" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Marge / Bonus (%)</label>
+                        <input type="number" id="xp-marge" min="0" value="30" step="0.5">
+                    </div>
+                </div>
+                <div class="result-box">
+                    <div class="result-label">Montant Total</div>
+                    <div class="result-value" id="res-xp-value">21.00<span class="unit">€</span></div>
+                    <div class="result-sub" id="res-xp-sub"></div>
+                    <div style="margin-top:0.8rem;font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--accent-blue);font-weight:600">
+                        ⚡ <span id="res-xp-pts">7</span> points d'XP
+                    </div>
+                    <div class="result-actions">
+                        <button class="btn" id="xp-copy-val" data-value="21.00" onclick="copyValue(this.dataset.value)">📋 Copier le prix</button>
+                        <button class="btn" id="xp-copy-pts" data-value="7" onclick="copyValue(this.dataset.value)">⚡ Copier l'XP</button>
+                        <button class="btn btn-gold" onclick="addXpLine()">🛒 Ajouter au panier</button>
+                    </div>
+                </div>
+                
+                <!-- PANIER / TICKET FORGE -->
+                <div class="card-title" style="margin-top:2rem">🛒 Panier Réparation / Fusion</div>
+                <div id="xp-cart-lines" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem">
+                    <div class="note-empty">Panier vide. Ajoutez des opérations !</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:1rem;">
+                    <div>
+                        <div class="result-label">Total Global</div>
+                        <div class="result-value" id="xp-cart-total">0.00<span class="unit">€</span></div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem">
+                        <button class="btn btn-sm btn-danger" onclick="clearXpCart()">Vider le panier</button>
+                        <button class="btn btn-sm" id="xp-cart-copy" data-value="0" onclick="copyValue(this.dataset.value)">📋 Copier Total</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== OPTIMISATION CUISSON (ex-Calculs) ===== -->
+        <div class="section" id="section-smelting">
+            <div class="page-header">
+                <h2>🔥 Optimisation Cuisson</h2>
+                <p>Déterminez le nombre de hauts fourneaux nécessaires pour atteindre votre quota</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🏭 Configuration Cuisson</div>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1.5;">
+                        <label>Matériau à cuire (Prix fixe/item)</label>
+                        <div class="material-toggle-group">
+                            <label class="mat-toggle">
+                                <input type="radio" name="smelt-mat" value="2.12" checked onchange="calcSmelt()">
+                                <div class="mat-card">
+                                    <span class="mat-icon">🟡</span>
+                                    <span class="mat-name">Or</span>
+                                    <span class="mat-price">2.12€</span>
+                                </div>
+                            </label>
+                            <label class="mat-toggle">
+                                <input type="radio" name="smelt-mat" value="1.79" onchange="calcSmelt()">
+                                <div class="mat-card">
+                                    <span class="mat-icon">⚪</span>
+                                    <span class="mat-name">Fer</span>
+                                    <span class="mat-price">1.79€</span>
+                                </div>
+                            </label>
+                            <label class="mat-toggle">
+                                <input type="radio" name="smelt-mat" value="1.30" onchange="calcSmelt()">
+                                <div class="mat-card">
+                                    <span class="mat-icon">🟠</span>
+                                    <span class="mat-name">Cuivre</span>
+                                    <span class="mat-price">1.30€</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Objectif de revenu (€) (Budget Max)</label>
+                        <input type="number" id="smelt-budget" min="1" value="1000" step="1" placeholder="Ex: 1000€" onchange="calcSmelt()" oninput="calcSmelt()">
+                    </div>
+                </div>
+
+                <div class="result-box" style="display: flex; gap: 1rem; padding: 0; background: transparent; border: none; box-shadow: none;">
+                    <div style="flex: 1; background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <div class="result-label">🏭 Hauts Fourneaux</div>
+                        <div class="result-value" id="smelt-haut-result">15</div>
+                        <div class="result-sub">Max: 15 unités</div>
+                    </div>
+                    <div style="flex: 1; background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+                        <div class="result-label">🔥 Fours classiques</div>
+                        <div class="result-value" id="smelt-four-result">0</div>
+                        <div class="result-sub">Surplus de production</div>
+                    </div>
+                </div>
+
+                <div class="result-box" style="margin-top:1rem">
+                    <div class="result-label">💰 Revenu total estimé</div>
+                    <div class="result-value" id="smelt-revenue" style="color:var(--accent-green)">640.00<span class="unit">€</span></div>
+                    <div class="result-sub" id="smelt-revenue-sub">640 items × 1.00€ = 640.00€</div>
+                    <div class="result-actions">
+                        <button class="btn" id="smelt-copy" onclick="copyValue(this.dataset.value)" data-value="640.00">📋 Copier le revenu</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== VENTE / CATALOGUE ===== -->
+        <div class="section" id="section-vente">
+            <div class="page-header">
+                <h2>📖 Catalogue & Pricer</h2>
+                <p>Gérez tous vos articles de référence avec leurs prix — Matériaux, Armures, Livres...</p>
+            </div>
+
+            <div class="notes-header">
+                <div class="vente-filters">
+                    <span class="tag tag-all active" data-vente-tag="all" onclick="setVenteFilter('all')">Tout</span>
+                    <span class="tag tag-encours" data-vente-tag="armures" onclick="setVenteFilter('armures')">🛡️ Armures</span>
+                    <span class="tag tag-attente" data-vente-tag="outils" onclick="setVenteFilter('outils')">⚔️ Outils</span>
+                    <span class="tag tag-termine" data-vente-tag="matériaux" onclick="setVenteFilter('matériaux')">📦 Matériaux</span>
+                    <span class="tag tag-urgent" data-vente-tag="livres" onclick="setVenteFilter('livres')">✨ Livres</span>
+                </div>
+                <button class="btn btn-gold" onclick="openVenteModal()">+ Nouvel article</button>
+            </div>
+
+            <!-- Dynamic sale items grouped by category -->
+            <div id="vente-dynamic-section"></div>
+        </div>
+
+        <!-- ===== ENCHANTEMENT ===== -->
+        <div class="section" id="section-enchantement">
+            <div class="page-header">
+                <h2>✨ Enchantements & Stuff</h2>
+                <p>Définissez les prix de vos enchantements et calculez le prix du stuff enchanté</p>
+            </div>
+
+            <!-- Configuration Prix Enchantements -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-title">📖 Prix des Tables d'Enchantement (Basé sur l'XP)</div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:0.5">
+                        <label>Multiplicateur d'XP (minimum 1)</label>
+                        <input type="number" id="ench-mult" min="1" step="0.5" value="1" onchange="runEnchantConfigCalc()" oninput="runEnchantConfigCalc()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Niveau 1 (~ 25 XP dépensés)</label>
+                        <input type="text" id="ench-price-1" readonly style="opacity:0.7;cursor:not-allowed" value="25.00€">
+                    </div>
+                    <div class="form-group">
+                        <label>Niveau 2 (~ 98 XP dépensés)</label>
+                        <input type="text" id="ench-price-2" readonly style="opacity:0.7;cursor:not-allowed" value="98.00€">
+                    </div>
+                    <div class="form-group">
+                        <label>Niveau 3 (30 -> 27 = 306 XP)</label>
+                        <input type="text" id="ench-price-3" readonly style="opacity:0.7;cursor:not-allowed" value="306.00€">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calculateur Stuff Enchanté -->
+            <div class="card">
+                <div class="card-title">✨ Calculateur Stuff Enchanté</div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Choisir l'objet de base (Taper pour chercher)</label>
+                        <input type="text" id="ench-base-item-input" list="ench-base-item-list" placeholder="Ex: Casque en Fer, Canne à pêche..." onchange="onEnchantBaseItemChange()">
+                        <datalist id="ench-base-item-list"></datalist>
+                        <input type="hidden" id="ench-base-price" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Marge / Bonus (%)</label>
+                        <input type="number" id="ench-marge" min="0" step="0.5" value="30" onchange="calcEnchantedStuff()" oninput="calcEnchantedStuff()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Ajouter des Enchantements Max Level</label>
+                    <div class="enchant-grid" id="ench-checkboxes">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                </div>
+
+                <div class="result-box">
+                    <div class="result-label">Prix du Stuff Enchanté</div>
+                    <div class="result-value" id="ench-total-value">0.00<span class="unit">€</span></div>
+                    <div class="result-sub" id="ench-total-sub">Sélectionnez un item et ajoutez des enchantements</div>
+                    <div class="result-actions">
+                        <button class="btn" id="ench-copy-val" data-value="0" onclick="copyValue(this.dataset.value)">📋 Copier le prix</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ADMINISTRATION ===== -->
+        <div class="section" id="section-admin">
+            <div class="page-header">
+                <h2>👑 Administration</h2>
+                <p>Gérez les accès et surveillez l'activité des joueurs</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+                    <div class="card-title" style="margin-bottom:0">Joueurs Inscrits</div>
+                    <button class="btn btn-sm" onclick="loadAdminUsers()">🔄 Actualiser</button>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Pseudo</th>
+                                <th>Rôle</th>
+                                <th>ID Firebase</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-user-list">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- NOTE MODAL -->
+    <div class="modal-overlay" id="note-modal">
+        <div class="modal-box">
+            <div class="modal-title" id="note-modal-title">Nouvelle note</div>
+            <div class="form-group">
+                <label>Titre</label>
+                <input type="text" id="note-input-title" placeholder="Ex: Commande diamants pour Joueur42">
+            </div>
+            <div class="form-group">
+                <label>Contenu</label>
+                <textarea id="note-input-text" placeholder="Détails de la transaction, quantités, prix convenus..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Statut</label>
+                <select id="note-input-tag">
+                    <option value="encours">🔵 En cours</option>
+                    <option value="attente">🟠 En attente</option>
+                    <option value="termine">🟢 Terminé</option>
+                    <option value="urgent">🔴 Urgent</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeNoteModal()">Annuler</button>
+                <button class="btn btn-gold" onclick="saveNote()">💾 Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEAMLESS MIGRATION: Material modal deleted -->
+
+    <!-- VENTE MODAL -->
+    <div class="modal-overlay" id="vente-modal">
+        <div class="modal-box">
+            <div class="modal-title" id="vente-modal-title">Nouvel article en vente</div>
+            <div class="form-group">
+                <label>Nom de l'article</label>
+                <input type="text" id="vente-input-name" placeholder="Ex: Stack de fer, Potion de force...">
+            </div>
+            <div class="form-group">
+                <label>Catégorie</label>
+                <input type="text" id="vente-input-category" list="vente-categories-list" placeholder="Ex: Armure, Outil, Matériau...">
+                <datalist id="vente-categories-list"></datalist>
+            </div>
+            <div class="form-group">
+                <label>Prix de base / Prix d'Achat (€)</label>
+                <input type="number" id="vente-input-price" min="0" step="0.5" placeholder="Prix de vente">
+            </div>
+            <div class="form-group">
+                <label>Prix du gain total lors du traitement (Cuisson+Craft) (€)</label>
+                <input type="number" id="vente-input-sell" min="0" step="0.5" placeholder="Ex: 5.5">
+            </div>
+            <div class="form-group">
+                <label>Icône</label>
+                <div class="emoji-picker-wrapper">
+                    <div class="emoji-selected" id="vente-icon-display" onclick="toggleVenteEmojiPicker()">
+                        <span id="vente-icon-preview">🏪</span>
+                        <span class="emoji-pick-label">Choisir une icône</span>
+                        <span class="emoji-pick-arrow">▼</span>
+                    </div>
+                    <input type="hidden" id="vente-input-icon" value="">
+                    <div class="emoji-picker" id="vente-emoji-picker"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeVenteModal()">Annuler</button>
+                <button class="btn btn-gold" onclick="saveVenteItem()">💾 Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TIMER MODAL -->
+    <div class="modal-overlay" id="timer-modal">
+        <div class="modal-box" style="text-align:center; padding:3rem 2rem;">
+            <div style="font-size:4rem; margin-bottom:1rem; animation: pulse 1s infinite alternate;">⏲️</div>
+            <div class="modal-title" style="margin-bottom:0.5rem; justify-content:center; text-align:center; display:block;">C'est l'heure !</div>
+            <p style="color:var(--text-muted); margin-bottom:2rem;">Le minuteur de 15 minutes est terminé.</p>
+            <div class="modal-actions" style="justify-content:center;">
+                <button class="btn btn-gold" onclick="closeTimerModal()">OK, j'ai compris</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TIMER WIDGET -->
+    <div class="timer-widget" id="timer-widget" onclick="toggleTimer()">
+        <div class="timer-icon" id="timer-icon">⏲️</div>
+        <div class="timer-display" id="timer-display">15:00</div>
+        <div class="timer-progress" id="timer-progress"></div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- DB OVERLAY / Loading -->
+    <div class="modal-overlay" id="loading-overlay" style="background: rgba(10,12,16,0.9); z-index: 9999;">
+        <div class="modal-box" style="text-align:center; padding:3rem 2rem; background: transparent; border: none; box-shadow: none;">
+            <div class="loading-spinner" style="font-size:3rem; animation: spin 1s linear infinite;">⏳</div>
+            <div style="margin-top: 1rem; font-family:'JetBrains Mono',monospace; color:var(--gold);">Synchronisation...</div>
+        </div>
+    </div>
+    
+    <!-- APP CLOSE -->
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

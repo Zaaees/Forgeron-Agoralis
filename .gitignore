@@ -1,0 +1,6 @@
+.agent/
+_bmad/
+_bmad-output/
+node_modules/
+.DS_Store
+*.log
