@@ -1120,16 +1120,27 @@ function closeEmojiPickerOnClickOutside(e) {
 function populateCalcCategories() {
     const sel = document.getElementById('calc-cat-select');
     if (!sel) return;
+    
     const items = loadData('vente');
-    const standardCategories = ['📦 Matériaux', '🛡️ Armures', '⚔️ Outils', '✨ Livres', '🧶 Divers'];
-    const existingCategories = items.map(i => i.category || '🧶 Divers');
+    // Requested order
+    const orderedKeys = ['📦 Matériaux', '⚔️ Outils', '🛡️ Armures', '✨ Livres', '🧶 Divers'];
     
-    const categories = [...new Set([...standardCategories, ...existingCategories])].filter(c => c && !c.includes('Cuisson'));
+    const existingCats = [...new Set(items.map(i => i.category || '🧶 Divers'))];
+    const otherCats = existingCats.filter(c => !orderedKeys.includes(c) && !c.includes('Cuisson')).sort();
     
-    sel.innerHTML = '<option value="all">📂 Toutes les catégories</option>';
-    categories.sort().forEach(c => {
+    const finalCategories = [...orderedKeys, ...otherCats];
+    
+    const currentVal = sel.value;
+    sel.innerHTML = ''; 
+    finalCategories.forEach(c => {
         sel.innerHTML += `<option value="${escHtml(c)}">${escHtml(c)}</option>`;
     });
+    
+    if (currentVal && finalCategories.includes(currentVal)) {
+        sel.value = currentVal;
+    } else if (finalCategories.length > 0) {
+        sel.value = finalCategories[0];
+    }
 }
 
 function populateMaterialSelects() {
