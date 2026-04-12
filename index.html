@@ -370,27 +370,36 @@
                         <label>Matériau à cuire (Prix fixe/item)</label>
                         <div class="material-toggle-group">
                             <label class="mat-toggle">
-                                <input type="radio" name="smelt-mat" value="2.12" checked onchange="calcSmelt()">
+                                <input type="radio" name="smelt-mat" value="" checked onchange="calcSmelt()">
                                 <div class="mat-card">
                                     <span class="mat-icon">🟡</span>
                                     <span class="mat-name">Or</span>
-                                    <span class="mat-price">2.12€</span>
+                                    <div class="mat-price-container">
+                                        <input type="number" id="smelt-price-or" class="smelt-price-input" value="2.12" step="0.01" onclick="event.stopPropagation()">
+                                        <span class="unit">€</span>
+                                    </div>
                                 </div>
                             </label>
                             <label class="mat-toggle">
-                                <input type="radio" name="smelt-mat" value="1.79" onchange="calcSmelt()">
+                                <input type="radio" name="smelt-mat" value="" onchange="calcSmelt()">
                                 <div class="mat-card">
                                     <span class="mat-icon">⚪</span>
                                     <span class="mat-name">Fer</span>
-                                    <span class="mat-price">1.79€</span>
+                                    <div class="mat-price-container">
+                                        <input type="number" id="smelt-price-fer" class="smelt-price-input" value="1.79" step="0.01" onclick="event.stopPropagation()">
+                                        <span class="unit">€</span>
+                                    </div>
                                 </div>
                             </label>
                             <label class="mat-toggle">
-                                <input type="radio" name="smelt-mat" value="1.30" onchange="calcSmelt()">
+                                <input type="radio" name="smelt-mat" value="" onchange="calcSmelt()">
                                 <div class="mat-card">
                                     <span class="mat-icon">🟠</span>
                                     <span class="mat-name">Cuivre</span>
-                                    <span class="mat-price">1.30€</span>
+                                    <div class="mat-price-container">
+                                        <input type="number" id="smelt-price-cuivre" class="smelt-price-input" value="1.30" step="0.01" onclick="event.stopPropagation()">
+                                        <span class="unit">€</span>
+                                    </div>
                                 </div>
                             </label>
                         </div>

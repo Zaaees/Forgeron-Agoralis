@@ -89,7 +89,8 @@ let currentPseudo = null;
 let appData = {
     notes: [],
     vente: [],
-    enchant_mult: 1
+    enchant_mult: 1,
+    smelt_prices: { Or: 2.12, Fer: 1.79, Cuivre: 1.30 }
 };
 let syncTimeout = null;
 let impersonateUid = null; // UID de la personne qu'on regarde
@@ -116,7 +117,8 @@ function triggerDbSync() {
         db.collection('users').doc(targetUid).collection('data').doc('store').set({
             notes: appData.notes || [],
             vente: appData.vente || [],
-            enchant_mult: appData.enchant_mult || 1
+            enchant_mult: appData.enchant_mult || 1,
+            smelt_prices: appData.smelt_prices || { Or: 2.12, Fer: 1.79, Cuivre: 1.30 }
         }, { merge: true })
         .catch(err => showToast("Erreur synchro cloud", "⚠️"))
         .finally(() => {
@@ -598,7 +600,11 @@ const ITEMS_PER_FURNACE = 64; // 1 stack per blast furnace per batch
 
 function calcSmelt() {
     const radio = document.querySelector('input[name="smelt-mat"]:checked');
-    const price = radio ? parseFloat(radio.value) : 0;
+    if (!radio) return;
+
+    const matName = radio.parentElement.querySelector('.mat-name').textContent;
+    const priceInput = document.getElementById(`smelt-price-${matName.toLowerCase()}`);
+    const price = priceInput ? parseFloat(priceInput.value) : 0;
     const maxBudget = parseFloat(document.getElementById('smelt-budget').value) || 0;
 
     let totalStacks = 0;
@@ -621,6 +627,30 @@ function calcSmelt() {
     document.getElementById('smelt-revenue').innerHTML = `${fmt(actualRevenue)}<span class="unit">€</span>`;
     document.getElementById('smelt-revenue-sub').textContent = `${actualItems} items (${totalStacks} stacks de 64) × ${price.toFixed(2)}€ = ${fmt(actualRevenue)}€`;
     document.getElementById('smelt-copy').dataset.value = fmt(actualRevenue);
+}
+
+function updateSmeltPrice(mat, val) {
+    if (!appData.smelt_prices) appData.smelt_prices = { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
+    const numVal = parseFloat(val);
+    if (!isNaN(numVal)) {
+        appData.smelt_prices[mat] = numVal;
+        triggerDbSync();
+    }
+    calcSmelt();
+}
+
+function updateSmeltPricesUI() {
+    if (!appData.smelt_prices) appData.smelt_prices = { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
+    
+    const orInput = document.getElementById('smelt-price-or');
+    const ferInput = document.getElementById('smelt-price-fer');
+    const cuivreInput = document.getElementById('smelt-price-cuivre');
+    
+    if (orInput) orInput.value = appData.smelt_prices.Or;
+    if (ferInput) ferInput.value = appData.smelt_prices.Fer;
+    if (cuivreInput) cuivreInput.value = appData.smelt_prices.Cuivre;
+    
+    calcSmelt();
 }
 
 // ========================
@@ -1436,6 +1466,17 @@ function initAppListeners() {
             input.dispatchEvent(new Event('change', { bubbles: true }));
         });
     });
+
+    // Listeners spéciaux pour les prix de cuisson
+    ['or', 'fer', 'cuivre'].forEach(mat => {
+        const input = document.getElementById(`smelt-price-${mat}`);
+        if (input) {
+            input.addEventListener('input', (e) => {
+                const matName = mat.charAt(0).toUpperCase() + mat.slice(1);
+                updateSmeltPrice(matName, e.target.value);
+            });
+        }
+    });
 }
 
 function finishAppBoot() {
@@ -1489,6 +1530,9 @@ function finishAppBoot() {
     loadEnchantConfig();
     renderEnchantCheckboxes();
     populateEnchantItems();
+    
+    // Initialiser les prix de cuisson dans l'UI
+    updateSmeltPricesUI();
     
     const overlay = document.getElementById('loading-overlay');
     if (overlay) overlay.classList.remove('active');
@@ -1664,15 +1708,18 @@ function impersonateUser(uid, pseudo) {
             appData.notes = data.notes || [];
             appData.vente = data.vente || [];
             appData.enchant_mult = data.enchant_mult || 1;
+            appData.smelt_prices = data.smelt_prices || { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
         } else {
             appData.notes = [];
             appData.vente = [];
             appData.enchant_mult = 1;
+            appData.smelt_prices = { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
             initVenteDataIfEmpty();
         }
         
         // Rafraîchir l'interface
         finishAppBoot();
+        updateSmeltPricesUI();
         showToast(`Impersonnalisation : ${pseudo}`, "👁️");
     }).catch(err => {
         console.error(err);
@@ -1697,10 +1744,12 @@ function stopImpersonating() {
             appData.notes = data.notes || [];
             appData.vente = data.vente || [];
             appData.enchant_mult = data.enchant_mult || 1;
+            appData.smelt_prices = data.smelt_prices || { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
         } else {
             initVenteDataIfEmpty();
         }
         finishAppBoot();
+        updateSmeltPricesUI();
         showToast("Retour sur votre compte", "✅");
     }).catch(err => {
         console.error(err);
@@ -1734,6 +1783,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 appData.notes = data.notes || [];
                                 appData.vente = data.vente || [];
                                 appData.enchant_mult = data.enchant_mult || 1;
+                                appData.smelt_prices = data.smelt_prices || { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
                             } else {
                                 // Default catalogue auto-generation on first login
                                 appData.vente = [];

@@ -1363,4 +1363,38 @@ textarea { resize: vertical; min-height: 100px; font-weight: 400; line-height: 1
 
 .mat-icon { font-size: 1.5rem; }
 .mat-name { font-weight: 700; font-size: 0.9rem; color: var(--text-heading); }
-.mat-price { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--gold); }
+.mat-price-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    margin-top: 2px;
+}
+.smelt-price-input {
+    width: 70px;
+    padding: 2px 4px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+    transition: all 0.2s;
+    outline: none;
+}
+.smelt-price-input:hover {
+    border-color: var(--gold-glow);
+    background: rgba(0,0,0,0.3);
+}
+.smelt-price-input:focus {
+    border-color: var(--gold);
+    background: var(--bg-input-focus);
+    box-shadow: 0 0 10px var(--gold-glow);
+}
+.smelt-price-input::-webkit-inner-spin-button, 
+.smelt-price-input::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
