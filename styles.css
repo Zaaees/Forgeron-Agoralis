@@ -376,10 +376,10 @@ textarea { resize: vertical; min-height: 100px; font-weight: 400; line-height: 1
 .result-value .unit { font-size: 1.2rem; color: var(--gold); margin-left: 4px; }
 
 .result-sub {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    margin-top: 4px;
-    font-style: italic;
+    color: var(--text-main);
+    font-size: 1.05rem;
+    margin-top: 8px;
+    line-height: 1.4;
 }
 
 .result-actions {

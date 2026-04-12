@@ -693,12 +693,19 @@ function calcSmelt() {
     items.forEach(it => {
         const s = bestCombo[it.name] || 0;
         if (s > 0) {
-            breakdown.push(`${s} pile${s > 1 ? 's' : ''} d'${it.name.toLowerCase()}`);
+            let label = "";
+            let color = "";
+            
+            if (it.name === "Or") { label = "d'Or"; color = "var(--gold)"; }
+            else if (it.name === "Fer") { label = "de Fer"; color = "#e5e7eb"; }
+            else if (it.name === "Cuivre") { label = "de Cuivre"; color = "#fb923c"; }
+            
+            breakdown.push(`${s} pile${s > 1 ? 's' : ''} <span style="color:${color}; font-weight:bold;">${label}</span>`);
         }
     });
     
     document.getElementById('smelt-revenue-sub').innerHTML = breakdown.length > 0 
-        ? `<strong>Répartition :</strong> ${breakdown.join(' + ')}<br><small>Soit ${totalStacks * 64} items au total</small>`
+        ? `<strong>Répartition :</strong> ${breakdown.join(' + ')}<br><span style="font-size:0.9rem; color:var(--text-muted);">Soit ${totalStacks * 64} items au total</span>`
         : "Budget trop faible pour une pile entière";
         
     document.getElementById('smelt-copy').dataset.value = fmt(actualRevenue);
