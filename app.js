@@ -90,7 +90,8 @@ let appData = {
     notes: [],
     vente: [],
     enchant_mult: 1,
-    smelt_prices: { Or: 2.12, Fer: 1.79, Cuivre: 1.30 }
+    smelt_prices: { Or: 2.12, Fer: 1.79, Cuivre: 1.30 },
+    smelt_priority: null
 };
 let syncTimeout = null;
 let impersonateUid = null; // UID de la personne qu'on regarde
@@ -630,9 +631,38 @@ function calcSmelt() {
     function solve(idx, currentBudget, currentCombo, currentTotalStacks) {
         if (idx === items.length) {
             const revenue = maxBudget - currentBudget;
-            // On privilégie la combinaison la plus proche du budget
-            // En cas d'égalité, on privilégie celle avec le moins de stacks
-            if (revenue > bestRevenue || (revenue === bestRevenue && currentTotalStacks < bestTotalStacks)) {
+            const priorityItemName = appData.smelt_priority;
+            const currentPriorityStacks = priorityItemName ? (currentCombo[priorityItemName] || 0) : 0;
+            const bestPriorityStacks = priorityItemName ? (bestCombo ? (bestCombo[priorityItemName] || 0) : 0) : 0;
+
+            // Critère 1 : Proximité du budget (le plus proche possible sans dépasser)
+            const isBetterRevenue = revenue > bestRevenue;
+            const isSameRevenue = revenue === bestRevenue;
+
+            // Critère 2 : Priorité Matériau (si défini)
+            const hasMorePriority = currentPriorityStacks > bestPriorityStacks;
+            const hasSamePriority = currentPriorityStacks === bestPriorityStacks;
+
+            // Critère 3 : Moins de stacks au total (efficacité brute)
+            const hasLessTotal = currentTotalStacks < bestTotalStacks;
+
+            let shouldUpdate = false;
+            
+            if (isBetterRevenue) {
+                shouldUpdate = true;
+            } else if (isSameRevenue) {
+                if (priorityItemName) {
+                    if (hasMorePriority) {
+                        shouldUpdate = true;
+                    } else if (hasSamePriority && hasLessTotal) {
+                        shouldUpdate = true;
+                    }
+                } else if (hasLessTotal) {
+                    shouldUpdate = true;
+                }
+            }
+
+            if (shouldUpdate) {
                 bestRevenue = revenue;
                 bestCombo = { ...currentCombo };
                 bestTotalStacks = currentTotalStacks;
@@ -732,6 +762,32 @@ function updateSmeltPrice(mat, val) {
     calcSmelt();
 }
 
+function toggleSmeltPriority(name, event) {
+    if (event) event.stopPropagation();
+    
+    if (appData.smelt_priority === name) {
+        appData.smelt_priority = null;
+    } else {
+        appData.smelt_priority = name;
+    }
+    
+    syncSmeltPriorityUI();
+    triggerDbSync();
+    calcSmelt();
+}
+
+function syncSmeltPriorityUI() {
+    document.querySelectorAll('.mat-priority-star').forEach(star => {
+        const matCard = star.closest('.mat-card');
+        const matName = matCard.querySelector('.mat-name').textContent;
+        if (matName === appData.smelt_priority) {
+            star.classList.add('is-priority');
+        } else {
+            star.classList.remove('is-priority');
+        }
+    });
+}
+
 function updateSmeltPricesUI() {
     if (!appData.smelt_prices) appData.smelt_prices = { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
     
@@ -743,6 +799,7 @@ function updateSmeltPricesUI() {
     if (ferInput) ferInput.value = (appData.smelt_prices.Fer !== undefined) ? appData.smelt_prices.Fer : 1.79;
     if (cuivreInput) cuivreInput.value = (appData.smelt_prices.Cuivre !== undefined) ? appData.smelt_prices.Cuivre : 1.30;
     
+    syncSmeltPriorityUI();
     calcSmelt();
 }
 
