@@ -646,9 +646,9 @@ function updateSmeltPricesUI() {
     const ferInput = document.getElementById('smelt-price-fer');
     const cuivreInput = document.getElementById('smelt-price-cuivre');
     
-    if (orInput) orInput.value = appData.smelt_prices.Or;
-    if (ferInput) ferInput.value = appData.smelt_prices.Fer;
-    if (cuivreInput) cuivreInput.value = appData.smelt_prices.Cuivre;
+    if (orInput) orInput.value = (appData.smelt_prices.Or !== undefined) ? appData.smelt_prices.Or : 2.12;
+    if (ferInput) ferInput.value = (appData.smelt_prices.Fer !== undefined) ? appData.smelt_prices.Fer : 1.79;
+    if (cuivreInput) cuivreInput.value = (appData.smelt_prices.Cuivre !== undefined) ? appData.smelt_prices.Cuivre : 1.30;
     
     calcSmelt();
 }
