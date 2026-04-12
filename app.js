@@ -1060,7 +1060,7 @@ function handleTimerClick() {
 function openTimerConfig() {
     const modal = document.getElementById('timer-config-modal');
     if (modal) {
-        document.getElementById('timer-custom-min').value = Math.floor(currentTimerDuration / 60);
+        document.getElementById('timer-custom-min').value = 15;
         modal.classList.add('active');
     }
 }
