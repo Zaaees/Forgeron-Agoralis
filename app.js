@@ -620,6 +620,14 @@ function calcSmelt() {
         return { name, icon, unitPrice, stackPrice: unitPrice * 64 };
     });
 
+    // Tri des items : On met le matériau prioritaire en PREMIER pour qu'il soit favorisé par le solver
+    // S'il n'y a pas de priorité, on garde le tri par prix décroissant
+    items.sort((a, b) => {
+        if (a.name === appData.smelt_priority) return -1;
+        if (b.name === appData.smelt_priority) return 1;
+        return b.stackPrice - a.stackPrice;
+    });
+
     // Algorithme d'optimisation (Solver de combinaison)
     // On cherche à maximiser le revenu sans dépasser le budget
     let bestCombo = null;
@@ -685,9 +693,9 @@ function calcSmelt() {
 
     const MAX_SEARCH_STACKS = 64; // On optimise finement sur les derniers 64 stacks
     
-    // On remplit avec le matériau le plus rentable (le plus cher) d'abord pour les gros budgets
-    items.sort((a, b) => b.stackPrice - a.stackPrice);
+    const MAX_SEARCH_STACKS = 64; 
     
+    // Phase gloutonne : On remplit avec le premier item de la liste (qui est soit le favori, soit le plus cher)
     if (maxBudget > MAX_SEARCH_STACKS * items[0].stackPrice) {
         const item = items[0];
         const bulkyStacks = Math.floor(maxBudget / item.stackPrice) - MAX_SEARCH_STACKS;
@@ -776,8 +784,8 @@ function toggleSmeltPriority(name, event) {
 
 function syncSmeltPriorityUI() {
     document.querySelectorAll('.mat-priority-star').forEach(star => {
-        const matCard = star.closest('.mat-card');
-        const matName = matCard.querySelector('.mat-name').textContent;
+        const wrapper = star.closest('.mat-item-wrapper');
+        const matName = wrapper.querySelector('.mat-name').textContent;
         if (matName === appData.smelt_priority) {
             star.classList.add('is-priority');
         } else {

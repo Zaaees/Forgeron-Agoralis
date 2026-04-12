@@ -1319,8 +1319,13 @@ textarea { resize: vertical; min-height: 100px; font-weight: 400; line-height: 1
     margin-top: 0.5rem;
 }
 
-.mat-toggle {
+.mat-item-wrapper {
     flex: 1;
+    position: relative;
+}
+
+.mat-toggle {
+    display: block;
     cursor: pointer;
 }
 
@@ -1395,14 +1400,15 @@ textarea { resize: vertical; min-height: 100px; font-weight: 400; line-height: 1
 
 .mat-priority-star {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    font-size: 1rem;
+    top: 5px;
+    right: 5px;
+    font-size: 1.15rem;
     cursor: pointer;
-    opacity: 0.2;
+    opacity: 0.3;
     transition: all 0.2s ease;
     filter: grayscale(1);
-    z-index: 10;
+    z-index: 20;
+    padding: 5px; /* Augmente la zone de clic */
 }
 
 .mat-priority-star:hover {
