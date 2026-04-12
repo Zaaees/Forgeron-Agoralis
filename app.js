@@ -599,24 +599,86 @@ function calcAnvilWear() {
 const ITEMS_PER_FURNACE = 64; // 1 stack per blast furnace per batch
 
 function calcSmelt() {
-    const radio = document.querySelector('input[name="smelt-mat"]:checked');
-    if (!radio) return;
-
-    const matName = radio.parentElement.querySelector('.mat-name').textContent;
-    const priceInput = document.getElementById(`smelt-price-${matName.toLowerCase()}`);
-    const price = priceInput ? parseFloat(priceInput.value) : 0;
+    const checked = Array.from(document.querySelectorAll('input[name="smelt-mat"]:checked'));
     const maxBudget = parseFloat(document.getElementById('smelt-budget').value) || 0;
-
-    let totalStacks = 0;
-    let actualRevenue = 0;
-    let actualItems = 0;
-
-    if (price > 0 && maxBudget > 0) {
-        const revenuePerStack = 64 * price;
-        totalStacks = Math.floor(maxBudget / revenuePerStack);
-        actualRevenue = totalStacks * revenuePerStack;
-        actualItems = totalStacks * 64;
+    
+    if (checked.length === 0 || maxBudget <= 0) {
+        document.getElementById('smelt-haut-result').textContent = '0';
+        document.getElementById('smelt-four-result').textContent = '0';
+        document.getElementById('smelt-revenue').innerHTML = `0.00<span class="unit">€</span>`;
+        document.getElementById('smelt-revenue-sub').textContent = "Sélectionnez au moins un matériau";
+        return;
     }
+
+    const items = checked.map(input => {
+        const parent = input.parentElement;
+        const name = parent.querySelector('.mat-name').textContent;
+        const icon = parent.querySelector('.mat-icon').textContent;
+        const priceInput = document.getElementById(`smelt-price-${name.toLowerCase()}`);
+        const unitPrice = priceInput ? parseFloat(priceInput.value) : 0;
+        return { name, icon, unitPrice, stackPrice: unitPrice * 64 };
+    });
+
+    // Algorithme d'optimisation (Solver de combinaison)
+    // On cherche à maximiser le revenu sans dépasser le budget
+    let bestCombo = null;
+    let bestRevenue = -1;
+    let bestTotalStacks = 0;
+
+    // Pour éviter de figer le navigateur, on limite à un nombre raisonnable de stacks par matériau
+    // Le jeu de Minecraft limite de toute façon l'inventaire
+    function solve(idx, currentBudget, currentCombo, currentTotalStacks) {
+        if (idx === items.length) {
+            const revenue = maxBudget - currentBudget;
+            // On privilégie la combinaison la plus proche du budget
+            // En cas d'égalité, on privilégie celle avec le moins de stacks
+            if (revenue > bestRevenue || (revenue === bestRevenue && currentTotalStacks < bestTotalStacks)) {
+                bestRevenue = revenue;
+                bestCombo = { ...currentCombo };
+                bestTotalStacks = currentTotalStacks;
+            }
+            return;
+        }
+
+        const item = items[idx];
+        const maxStacks = Math.floor(currentBudget / item.stackPrice);
+        
+        // On teste toutes les possibilités pour ce matériau
+        // Optimisation : si on a déjà un revenu parfait (0€ de reste), on s'arrête
+        for (let s = maxStacks; s >= 0; s--) {
+            currentCombo[item.name] = s;
+            solve(idx + 1, currentBudget - (s * item.stackPrice), currentCombo, currentTotalStacks + s);
+            if (bestRevenue === maxBudget) break; 
+        }
+    }
+
+    // Si le budget est énorme (> 10 double coffres), on utilise une approche gloutonne pour dégrossir
+    let startupRevenue = 0;
+    let startupStacks = 0;
+    let startupCombo = {};
+    let searchBudget = maxBudget;
+
+    const MAX_SEARCH_STACKS = 64; // On optimise finement sur les derniers 64 stacks
+    
+    // On remplit avec le matériau le plus rentable (le plus cher) d'abord pour les gros budgets
+    items.sort((a, b) => b.stackPrice - a.stackPrice);
+    
+    if (maxBudget > MAX_SEARCH_STACKS * items[0].stackPrice) {
+        const item = items[0];
+        const bulkyStacks = Math.floor(maxBudget / item.stackPrice) - MAX_SEARCH_STACKS;
+        if (bulkyStacks > 0) {
+            startupCombo[item.name] = bulkyStacks;
+            startupRevenue = bulkyStacks * item.stackPrice;
+            startupStacks = bulkyStacks;
+            searchBudget = maxBudget - startupRevenue;
+        }
+    }
+
+    solve(0, searchBudget, startupCombo, startupStacks);
+
+    // Mise à jour de l'UI
+    const totalStacks = bestTotalStacks;
+    const actualRevenue = bestRevenue;
 
     const nbHaut = Math.min(15, totalStacks);
     const nbFour = Math.max(0, totalStacks - 15);
@@ -625,7 +687,20 @@ function calcSmelt() {
     document.getElementById('smelt-four-result').textContent = nbFour;
 
     document.getElementById('smelt-revenue').innerHTML = `${fmt(actualRevenue)}<span class="unit">€</span>`;
-    document.getElementById('smelt-revenue-sub').textContent = `${actualItems} items (${totalStacks} stacks de 64) × ${price.toFixed(2)}€ = ${fmt(actualRevenue)}€`;
+    
+    // Construction de la "liste de courses"
+    let breakdown = [];
+    items.forEach(it => {
+        const s = bestCombo[it.name] || 0;
+        if (s > 0) {
+            breakdown.push(`${s} pile${s > 1 ? 's' : ''} d'${it.name.toLowerCase()}`);
+        }
+    });
+    
+    document.getElementById('smelt-revenue-sub').innerHTML = breakdown.length > 0 
+        ? `<strong>Répartition :</strong> ${breakdown.join(' + ')}<br><small>Soit ${totalStacks * 64} items au total</small>`
+        : "Budget trop faible pour une pile entière";
+        
     document.getElementById('smelt-copy').dataset.value = fmt(actualRevenue);
 }
 
