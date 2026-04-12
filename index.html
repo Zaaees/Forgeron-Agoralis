@@ -370,7 +370,7 @@
                         <label>Matériaux à cuire (Sélection multiple possible - Prix fixe/item)</label>
                         <div class="material-toggle-group">
                             <div class="mat-item-wrapper">
-                                <span class="mat-priority-star" onclick="toggleSmeltPriority('Or', event)" title="Définir comme priorité">⭐</span>
+                                <button type="button" class="mat-priority-btn" onclick="toggleSmeltPriority('Or', event)" title="Définir comme priorité">⭐</button>
                                 <label class="mat-toggle">
                                     <input type="checkbox" name="smelt-mat" value="" checked onchange="calcSmelt()">
                                     <div class="mat-card">
@@ -384,7 +384,7 @@
                                 </label>
                             </div>
                             <div class="mat-item-wrapper">
-                                <span class="mat-priority-star" onclick="toggleSmeltPriority('Fer', event)" title="Définir comme priorité">⭐</span>
+                                <button type="button" class="mat-priority-btn" onclick="toggleSmeltPriority('Fer', event)" title="Définir comme priorité">⭐</button>
                                 <label class="mat-toggle">
                                     <input type="checkbox" name="smelt-mat" value="" onchange="calcSmelt()">
                                     <div class="mat-card">
@@ -398,7 +398,7 @@
                                 </label>
                             </div>
                             <div class="mat-item-wrapper">
-                                <span class="mat-priority-star" onclick="toggleSmeltPriority('Cuivre', event)" title="Définir comme priorité">⭐</span>
+                                <button type="button" class="mat-priority-btn" onclick="toggleSmeltPriority('Cuivre', event)" title="Définir comme priorité">⭐</button>
                                 <label class="mat-toggle">
                                     <input type="checkbox" name="smelt-mat" value="" onchange="calcSmelt()">
                                     <div class="mat-card">

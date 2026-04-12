@@ -629,43 +629,25 @@ function calcSmelt() {
     });
 
     // Algorithme d'optimisation (Solver de combinaison)
-    // On cherche à maximiser le revenu sans dépasser le budget
+    // On cherche à maximiser le revenu tout en favorisant le matériau prioritaire
     let bestCombo = null;
     let bestRevenue = -1;
     let bestTotalStacks = 0;
+    let bestScore = -1; // Le score combine revenu et priorité
 
-    // Pour éviter de figer le navigateur, on limite à un nombre raisonnable de stacks par matériau
-    // Le jeu de Minecraft limite de toute façon l'inventaire
     function solve(idx, currentBudget, currentCombo, currentTotalStacks) {
         if (idx === items.length) {
             const revenue = maxBudget - currentBudget;
             const priorityItemName = appData.smelt_priority;
-            const currentPriorityStacks = priorityItemName ? (currentCombo[priorityItemName] || 0) : 0;
-            const bestPriorityStacks = priorityItemName ? (bestCombo ? (bestCombo[priorityItemName] || 0) : 0) : 0;
-
-            // NOUVELLE LOGIQUE : Priorité au matériau favori d'abord
-            let shouldUpdate = false;
+            const priorityStacks = priorityItemName ? (currentCombo[priorityItemName] || 0) : 0;
             
-            if (priorityItemName) {
-                // Si on a un favori, le critère n°1 est d'en avoir le maximum
-                if (currentPriorityStacks > bestPriorityStacks) {
-                    shouldUpdate = true;
-                } else if (currentPriorityStacks === bestPriorityStacks) {
-                    // À nombre égal de favori, on prend celui qui rapporte le plus (proximité budget)
-                    if (revenue > bestRevenue) {
-                        shouldUpdate = true;
-                    } else if (revenue === bestRevenue && currentTotalStacks < bestTotalStacks) {
-                        shouldUpdate = true;
-                    }
-                }
-            } else {
-                // Comportement standard sans favori : proximité budget d'abord
-                if (revenue > bestRevenue || (revenue === bestRevenue && currentTotalStacks < bestTotalStacks)) {
-                    shouldUpdate = true;
-                }
-            }
+            // LOGIQUE D'ÉQUILIBRE : 
+            // Chaque pile du matériau favori apporte un "bonus" de 25€ de valeur virtuelle
+            // Cela permet de préférer une combinaison avec plus de favori même si elle est un peu moins précise
+            const score = revenue + (priorityStacks * 25);
 
-            if (shouldUpdate) {
+            if (score > bestScore || (score === bestScore && currentTotalStacks < bestTotalStacks)) {
+                bestScore = score;
                 bestRevenue = revenue;
                 bestCombo = { ...currentCombo };
                 bestTotalStacks = currentTotalStacks;
@@ -695,7 +677,9 @@ function calcSmelt() {
     
     const MAX_SEARCH_STACKS = 64; 
     
-    // Phase gloutonne : On remplit avec le premier item de la liste (qui est soit le favori, soit le plus cher)
+    // Phase gloutonne standard (le score gérera la priorité pendant l'optimisation fine)
+    items.sort((a, b) => b.stackPrice - a.stackPrice);
+    
     if (maxBudget > MAX_SEARCH_STACKS * items[0].stackPrice) {
         const item = items[0];
         const bulkyStacks = Math.floor(maxBudget / item.stackPrice) - MAX_SEARCH_STACKS;
@@ -783,13 +767,13 @@ function toggleSmeltPriority(name, event) {
 }
 
 function syncSmeltPriorityUI() {
-    document.querySelectorAll('.mat-priority-star').forEach(star => {
-        const wrapper = star.closest('.mat-item-wrapper');
+    document.querySelectorAll('.mat-priority-btn').forEach(btn => {
+        const wrapper = btn.closest('.mat-item-wrapper');
         const matName = wrapper.querySelector('.mat-name').textContent;
         if (matName === appData.smelt_priority) {
-            star.classList.add('is-priority');
+            btn.classList.add('is-priority');
         } else {
-            star.classList.remove('is-priority');
+            btn.classList.remove('is-priority');
         }
     });
 }
