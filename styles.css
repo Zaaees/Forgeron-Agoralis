@@ -1320,7 +1320,7 @@ textarea { resize: vertical; min-height: 100px; font-weight: 400; line-height: 1
     cursor: pointer;
 }
 
-.mat-toggle input {
+.mat-toggle input[type="radio"] {
     display: none;
 }
 
