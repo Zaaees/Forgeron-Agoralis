@@ -675,8 +675,6 @@ function calcSmelt() {
 
     const MAX_SEARCH_STACKS = 64; // On optimise finement sur les derniers 64 stacks
     
-    const MAX_SEARCH_STACKS = 64; 
-    
     // Phase gloutonne standard (le score gérera la priorité pendant l'optimisation fine)
     items.sort((a, b) => b.stackPrice - a.stackPrice);
     
