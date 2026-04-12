@@ -1042,34 +1042,62 @@ function buildVenteEmojiPicker() {
 }
 
 // ========================
-// TIMER (15 minutes)
+// TIMER (Customizable)
 // ========================
-const TIMER_DURATION = 15 * 60; // 15 minutes in seconds
-const TIMER_STORAGE_KEY = 'agoralis_timer_end';
 let timerInterval = null;
-let timerRemaining = TIMER_DURATION;
+let timerRemaining = 15 * 60;
 let timerEndTime = null;
 let timerState = 'idle'; // idle, running, done
+let currentTimerDuration = 15 * 60; // Par défaut 15 min
 
-function toggleTimer() {
-    if (timerState === 'idle') {
-        startTimer();
-    } else if (timerState === 'running') {
+function handleTimerClick() {
+    if (timerState === 'running') {
         stopTimer();
-    } else if (timerState === 'done') {
-        resetTimer();
+    }
+    openTimerConfig();
+}
+
+function openTimerConfig() {
+    const modal = document.getElementById('timer-config-modal');
+    if (modal) {
+        document.getElementById('timer-custom-min').value = Math.floor(currentTimerDuration / 60);
+        modal.classList.add('active');
     }
 }
 
-function startTimer(resumeEndTime = null) {
+function closeTimerConfig() {
+    const modal = document.getElementById('timer-config-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function startCustomTimer() {
+    const minInput = document.getElementById('timer-custom-min');
+    let mins = parseInt(minInput.value) || 15;
+    
+    // Contrainte : Max 15 minutes
+    if (mins > 15) {
+        showToast('Maximum 15 minutes !', '⚠️');
+        mins = 15;
+    }
+    if (mins < 1) mins = 1;
+
+    currentTimerDuration = mins * 60;
+    timerRemaining = currentTimerDuration;
+    closeTimerConfig();
+    startTimer();
+}
+
+function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
 
     timerState = 'running';
-    timerEndTime = Date.now() + (TIMER_DURATION * 1000);
+    timerEndTime = Date.now() + (currentTimerDuration * 1000);
     
     const widget = document.getElementById('timer-widget');
-    widget.classList.add('running');
-    widget.classList.remove('done');
+    if (widget) {
+        widget.classList.add('running');
+        widget.classList.remove('done');
+    }
     document.getElementById('timer-icon').textContent = '⏳';
     
     updateTimerRemaining();
@@ -1084,7 +1112,8 @@ function startTimer(resumeEndTime = null) {
         }
     }, 1000);
 
-    showToast('Minuteur 15 min lancé !', '⏳');
+    const mins = Math.floor(currentTimerDuration / 60);
+    showToast(`Minuteur ${mins} min lancé !`, '⏳');
 }
 
 function updateTimerRemaining() {
@@ -1113,13 +1142,13 @@ function stopTimer() {
     clearInterval(timerInterval);
     timerInterval = null;
     timerState = 'idle';
-    timerRemaining = TIMER_DURATION;
+    timerRemaining = currentTimerDuration;
     timerEndTime = null;
     
     const widget = document.getElementById('timer-widget');
-    widget.classList.remove('running', 'done');
+    if (widget) widget.classList.remove('running', 'done');
     document.getElementById('timer-icon').textContent = '⏲️';
-    document.getElementById('timer-display').textContent = '15:00';
+    updateTimerDisplay();
     document.getElementById('timer-progress').style.transform = 'scaleX(1)';
     showToast('Minuteur arrêté', '⏹️');
 }
@@ -1131,11 +1160,12 @@ function resetTimer() {
 function updateTimerDisplay() {
     const mins = Math.floor(timerRemaining / 60);
     const secs = timerRemaining % 60;
-    document.getElementById('timer-display').textContent = 
-        `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const disp = document.getElementById('timer-display');
+    if (disp) disp.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
-    const progress = timerRemaining / TIMER_DURATION;
-    document.getElementById('timer-progress').style.transform = `scaleX(${progress})`;
+    const progress = timerRemaining / currentTimerDuration;
+    const progBar = document.getElementById('timer-progress');
+    if (progBar) progBar.style.transform = `scaleX(${progress})`;
 }
 
 function playTimerSound() {
