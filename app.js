@@ -139,7 +139,10 @@ function switchTab(tabId) {
     document.body.setAttribute('data-tab', tabId);
     
     // Auto-load admin data if needed
-    if (tabId === 'admin') loadAdminUsers();
+    if (tabId === 'admin') {
+        loadAdminUsers();
+        loadActivityLogs();
+    }
 }
 
 // ========================
@@ -742,6 +745,7 @@ function updateSmeltPrice(mat, val) {
     const numVal = parseFloat(val);
     if (!isNaN(numVal)) {
         appData.smelt_prices[mat] = numVal;
+        addActivityLog('Prix Cuisson', `${mat} -> ${numVal}€`);
         triggerDbSync();
     }
     calcSmelt();
@@ -755,8 +759,10 @@ function toggleSmeltPriority(name, event) {
     
     if (appData.smelt_priority === name) {
         appData.smelt_priority = null;
+        addActivityLog('Priorité Cuisson', `Retirée pour ${name}`);
     } else {
         appData.smelt_priority = name;
+        addActivityLog('Priorité Cuisson', `Définie sur ${name}`);
     }
     
     syncSmeltPriorityUI();
@@ -840,17 +846,21 @@ function saveVenteItem() {
     populateMaterialSelects();
     populateXpItems();
     closeVenteModal();
+    const actionLabel = editingVenteId ? 'Modification article' : 'Ajout article';
+    addActivityLog(actionLabel, `${name} (${fmt(price)}€)`);
     showToast(editingVenteId ? 'Article modifié' : 'Article ajouté', '🏪');
 }
 
 function deleteVenteItem(id) {
     if (!confirm('Supprimer cet article ?')) return;
+    const deletedItem = loadData('vente').find(i => i.id === id);
     const items = loadData('vente').filter(i => i.id !== id);
     saveData('vente', items);
     renderVente();
     populateCalcCategories();
     populateMaterialSelects();
     populateXpItems();
+    if (deletedItem) addActivityLog('Suppression article', deletedItem.name);
     showToast('Article supprimé', '🗑️');
 }
 
@@ -1200,14 +1210,18 @@ function saveNote() {
     saveData('notes', notes);
     renderNotes();
     closeNoteModal();
+    const actionLabel = editingNoteId ? 'Modification note' : 'Ajout note';
+    addActivityLog(actionLabel, title);
     showToast(editingNoteId ? 'Note modifiée' : 'Note ajoutée', '📝');
 }
 
 function deleteNote(id) {
     if (!confirm('Supprimer cette note ?')) return;
+    const deletedNote = loadData('notes').find(n => n.id === id);
     const notes = loadData('notes').filter(n => n.id !== id);
     saveData('notes', notes);
     renderNotes();
+    if (deletedNote) addActivityLog('Suppression note', deletedNote.title);
     showToast('Note supprimée', '🗑️');
 }
 
@@ -1710,6 +1724,9 @@ function handleLogin() {
     const password = pin + '00';
     
     auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+        // Le log sera fait dans onAuthStateChanged pour être sûr
+    })
     .catch(error => {
         console.error("Login Error:", error);
         alert("Erreur de connexion : " + error.message);
@@ -1820,6 +1837,7 @@ function deleteUser(uid, pseudo) {
     db.collection('users').doc(uid).collection('data').doc('store').delete().then(() => {
         return db.collection('users').doc(uid).delete();
     }).then(() => {
+        addActivityLog('Suppression Joueur', pseudo);
         showToast(`Joueur ${pseudo} supprimé`, "✅");
         loadAdminUsers();
     }).catch(err => {
@@ -1858,6 +1876,7 @@ function impersonateUser(uid, pseudo) {
         // Rafraîchir l'interface
         finishAppBoot();
         updateSmeltPricesUI();
+        addActivityLog('Impersonnalisation', `Regarde le compte de ${pseudo}`);
         showToast(`Impersonnalisation : ${pseudo}`, "👁️");
     }).catch(err => {
         console.error(err);
@@ -1888,12 +1907,73 @@ function stopImpersonating() {
         }
         finishAppBoot();
         updateSmeltPricesUI();
+        addActivityLog('Fin Impersonnalisation', "Retour sur son propre compte");
         showToast("Retour sur votre compte", "✅");
     }).catch(err => {
         console.error(err);
     }).finally(() => {
         if (overlay) overlay.classList.remove('active');
     });
+}
+
+// --- NOUVELLES FONCTIONS LOGGING ---
+
+function addActivityLog(action, details) {
+    if (!db || !currentUser || !currentPseudo) return;
+    
+    // On ne loggue pas si on est en train d'impersonner quelqu'un (trop bruyant et fausse les logs)
+    // Sauf si c'est l'action d'impersonnalisation elle-même (qui est gérée dans les fonctions dédiées)
+    
+    db.collection('activity_logs').add({
+        pseudo: currentPseudo,
+        action: action,
+        details: details || "",
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.error("Error adding log:", err));
+}
+
+function loadActivityLogs() {
+    const listEl = document.getElementById('admin-activity-list');
+    if (!listEl) return;
+    
+    listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem;">⏳ Chargement de l\'historique...</td></tr>';
+    
+    db.collection('activity_logs')
+        .orderBy('timestamp', 'desc')
+        .limit(50)
+        .get()
+        .then(snap => {
+            listEl.innerHTML = '';
+            if (snap.empty) {
+                listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem; opacity: 0.5;">Aucune activité enregistrée.</td></tr>';
+                return;
+            }
+            
+            snap.forEach(doc => {
+                const log = doc.data();
+                const tr = document.createElement('tr');
+                
+                let dateStr = "En cours...";
+                if (log.timestamp) {
+                    dateStr = log.timestamp.toDate().toLocaleString('fr-FR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+                
+                tr.innerHTML = `
+                    <td style="font-size:0.8rem; opacity:0.7">${dateStr}</td>
+                    <td style="font-weight:600; color:var(--gold)">${log.pseudo}</td>
+                    <td><span class="tag" style="background:var(--bg-body); border:1px solid var(--border); font-size:0.7rem">${log.action}</span></td>
+                    <td style="font-size:0.9rem">${log.details}</td>
+                `;
+                listEl.appendChild(tr);
+            });
+        })
+        .catch(err => {
+            console.error("Error loading logs:", err);
+            listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--accent-red)">Erreur de chargement des logs.</td></tr>';
+        });
 }
 
 // Initialise Firebase Auth Listener
@@ -1931,6 +2011,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (appData.vente.length === 0 || currentPseudo === 'Zaès') {
                                 initVenteDataIfEmpty();
                             }
+                            addActivityLog('Connexion', 'Session démarrée');
                             finishAppBoot();
                         }).catch(e => {
                             console.error(e);
