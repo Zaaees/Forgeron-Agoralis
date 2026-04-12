@@ -635,29 +635,24 @@ function calcSmelt() {
             const currentPriorityStacks = priorityItemName ? (currentCombo[priorityItemName] || 0) : 0;
             const bestPriorityStacks = priorityItemName ? (bestCombo ? (bestCombo[priorityItemName] || 0) : 0) : 0;
 
-            // Critère 1 : Proximité du budget (le plus proche possible sans dépasser)
-            const isBetterRevenue = revenue > bestRevenue;
-            const isSameRevenue = revenue === bestRevenue;
-
-            // Critère 2 : Priorité Matériau (si défini)
-            const hasMorePriority = currentPriorityStacks > bestPriorityStacks;
-            const hasSamePriority = currentPriorityStacks === bestPriorityStacks;
-
-            // Critère 3 : Moins de stacks au total (efficacité brute)
-            const hasLessTotal = currentTotalStacks < bestTotalStacks;
-
+            // NOUVELLE LOGIQUE : Priorité au matériau favori d'abord
             let shouldUpdate = false;
             
-            if (isBetterRevenue) {
-                shouldUpdate = true;
-            } else if (isSameRevenue) {
-                if (priorityItemName) {
-                    if (hasMorePriority) {
+            if (priorityItemName) {
+                // Si on a un favori, le critère n°1 est d'en avoir le maximum
+                if (currentPriorityStacks > bestPriorityStacks) {
+                    shouldUpdate = true;
+                } else if (currentPriorityStacks === bestPriorityStacks) {
+                    // À nombre égal de favori, on prend celui qui rapporte le plus (proximité budget)
+                    if (revenue > bestRevenue) {
                         shouldUpdate = true;
-                    } else if (hasSamePriority && hasLessTotal) {
+                    } else if (revenue === bestRevenue && currentTotalStacks < bestTotalStacks) {
                         shouldUpdate = true;
                     }
-                } else if (hasLessTotal) {
+                }
+            } else {
+                // Comportement standard sans favori : proximité budget d'abord
+                if (revenue > bestRevenue || (revenue === bestRevenue && currentTotalStacks < bestTotalStacks)) {
                     shouldUpdate = true;
                 }
             }
@@ -763,7 +758,10 @@ function updateSmeltPrice(mat, val) {
 }
 
 function toggleSmeltPriority(name, event) {
-    if (event) event.stopPropagation();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     
     if (appData.smelt_priority === name) {
         appData.smelt_priority = null;
