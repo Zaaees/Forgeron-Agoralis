@@ -689,24 +689,35 @@ function calcSmelt() {
     document.getElementById('smelt-revenue').innerHTML = `${fmt(actualRevenue)}<span class="unit">€</span>`;
     
     // Construction de la "liste de courses"
-    let breakdown = [];
+    let breakdownParts = [];
+    let itemDetails = [];
+    
     items.forEach(it => {
         const s = bestCombo[it.name] || 0;
         if (s > 0) {
-            let label = "";
+            let labelText = "";
             let color = "";
             
-            if (it.name === "Or") { label = "d'Or"; color = "var(--gold)"; }
-            else if (it.name === "Fer") { label = "de Fer"; color = "#e5e7eb"; }
-            else if (it.name === "Cuivre") { label = "de Cuivre"; color = "#fb923c"; }
+            if (it.name === "Or") { labelText = "d'Or"; color = "var(--gold)"; }
+            else if (it.name === "Fer") { labelText = "de Fer"; color = "#e5e7eb"; }
+            else if (it.name === "Cuivre") { labelText = "de Cuivre"; color = "#fb923c"; }
             
-            breakdown.push(`${s} pile${s > 1 ? 's' : ''} <span style="color:${color}; font-weight:bold;">${label}</span>`);
+            breakdownParts.push(`<span style="color:${color}; font-weight:bold;">${s} pile${s > 1 ? 's' : ''} ${labelText}</span>`);
+            itemDetails.push(`${s * 64} ${it.name}`);
         }
     });
     
-    document.getElementById('smelt-revenue-sub').innerHTML = breakdown.length > 0 
-        ? `<strong>Répartition :</strong> ${breakdown.join(' + ')}<br><span style="font-size:0.9rem; color:var(--text-muted);">Soit ${totalStacks * 64} items au total</span>`
-        : "Budget trop faible pour une pile entière";
+    const resultElement = document.getElementById('smelt-revenue-sub');
+    if (breakdownParts.length > 0) {
+        resultElement.innerHTML = `
+            <div style="margin-bottom: 5px;"><strong>Répartition :</strong> ${breakdownParts.join(' + ')}</div>
+            <div style="font-size: 0.95rem; color: var(--text-muted); font-weight: normal;">
+                Soit ${itemDetails.join(' + ')} (${totalStacks * 64} items au total)
+            </div>
+        `;
+    } else {
+        resultElement.textContent = "Budget trop faible pour une pile entière";
+    }
         
     document.getElementById('smelt-copy').dataset.value = fmt(actualRevenue);
 }
