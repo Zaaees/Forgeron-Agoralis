@@ -87,6 +87,13 @@
                         <div class="role-icon">⚡</div>
                         <div class="role-name">Forgeron</div>
                     </div>
+                    <div class="role-option" data-role="visiteur" onclick="selectRole('visiteur')">
+                        <div class="role-icon">👁️</div>
+                        <div class="role-name">Visiteur</div>
+                    </div>
+                </div>
+                <div class="visitor-notice" id="visitor-notice" style="display:none;">
+                    <span>👁️</span> Compte visiteur : accès en lecture seule, supprimé automatiquement après 5 jours.
                 </div>
                 <input type="hidden" id="register-role" value="">
             </div>
@@ -154,6 +161,14 @@
 
     <!-- MAIN CONTENT -->
     <main class="main-content">
+        <!-- VISITOR BANNER -->
+        <div id="visitor-banner" class="visitor-banner" style="display:none;">
+            <div class="banner-content">
+                <span class="banner-icon">👁️</span>
+                <span>Mode Visiteur — Consultation uniquement. Votre compte expire dans <strong id="visitor-days-left">5</strong> jour(s).</span>
+            </div>
+        </div>
+
         <!-- IMPERSONATION BANNER -->
         <div id="impersonation-banner" class="impersonation-banner" style="display:none;">
             <div class="banner-content">
@@ -556,6 +571,28 @@
                         </thead>
                         <tbody id="admin-user-list">
                             <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 2rem;">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+                    <div class="card-title" style="margin-bottom:0">👁️ Historique des Visiteurs</div>
+                    <button class="btn btn-sm" onclick="loadVisitorHistory()">🔄 Actualiser</button>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Pseudo</th>
+                                <th>Date d'inscription</th>
+                                <th>Expiration</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-visitor-list">
+                            <tr><td colspan="4" style="text-align:center; padding: 2rem; opacity: 0.5;">Cliquez sur Actualiser pour charger l'historique des visiteurs.</td></tr>
                         </tbody>
                     </table>
                 </div>

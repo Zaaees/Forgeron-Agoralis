@@ -107,7 +107,7 @@ function saveData(key, data) {
 }
 
 function triggerDbSync() {
-    if (!currentUser || !db) return;
+    if (!currentUser || !db || isVisitor()) return;
     const targetUid = impersonateUid || currentUser.uid;
     
     clearTimeout(syncTimeout);
@@ -142,6 +142,8 @@ function switchTab(tabId) {
     if (tabId === 'admin') {
         loadAdminUsers();
         loadActivityLogs();
+        loadVisitorHistory();
+        cleanupExpiredVisitors();
     }
 }
 
@@ -741,6 +743,7 @@ function calcSmelt() {
 }
 
 function updateSmeltPrice(mat, val) {
+    if (visitorGuard()) return;
     if (!appData.smelt_prices) appData.smelt_prices = { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
     const numVal = parseFloat(val);
     if (!isNaN(numVal)) {
@@ -752,6 +755,7 @@ function updateSmeltPrice(mat, val) {
 }
 
 function toggleSmeltPriority(name, event) {
+    if (visitorGuard()) return;
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -801,6 +805,7 @@ function updateSmeltPricesUI() {
 // VENTE MODULE
 // ========================
 function openVenteModal(item = null) {
+    if (visitorGuard()) return;
     editingVenteId = item ? item.id : null;
     document.getElementById('vente-modal-title').textContent = item ? "Modifier l'article" : 'Nouvel article en vente';
     document.getElementById('vente-input-name').value = item ? item.name : '';
@@ -825,6 +830,7 @@ function closeVenteModal() {
 }
 
 function saveVenteItem() {
+    if (visitorGuard()) return;
     const name = document.getElementById('vente-input-name').value.trim();
     const category = document.getElementById('vente-input-category').value.trim() || 'Général';
     const price = parseFloat(document.getElementById('vente-input-price').value);
@@ -852,6 +858,7 @@ function saveVenteItem() {
 }
 
 function deleteVenteItem(id) {
+    if (visitorGuard()) return;
     if (!confirm('Supprimer cet article ?')) return;
     const deletedItem = loadData('vente').find(i => i.id === id);
     const items = loadData('vente').filter(i => i.id !== id);
@@ -1211,6 +1218,7 @@ function closeTimerModal() {
 // NOTES MODULE
 // ========================
 function openNoteModal(note = null) {
+    if (visitorGuard()) return;
     editingNoteId = note ? note.id : null;
     document.getElementById('note-modal-title').textContent = note ? 'Modifier la note' : 'Nouvelle note';
     document.getElementById('note-input-title').value = note ? note.title : '';
@@ -1225,6 +1233,7 @@ function closeNoteModal() {
 }
 
 function saveNote() {
+    if (visitorGuard()) return;
     const title = document.getElementById('note-input-title').value.trim();
     const text = document.getElementById('note-input-text').value.trim();
     const tag = document.getElementById('note-input-tag').value;
@@ -1246,6 +1255,7 @@ function saveNote() {
 }
 
 function deleteNote(id) {
+    if (visitorGuard()) return;
     if (!confirm('Supprimer cette note ?')) return;
     const deletedNote = loadData('notes').find(n => n.id === id);
     const notes = loadData('notes').filter(n => n.id !== id);
@@ -1675,11 +1685,16 @@ function finishAppBoot() {
     if(enchantTab) enchantTab.classList.add('hidden-tab');
     if(adminTab) adminTab.style.display = 'none';
     
+    // Reset visitor state
+    const visitorBanner = document.getElementById('visitor-banner');
+    if (visitorBanner) visitorBanner.style.display = 'none';
+    removeVisitorReadOnly();
+
     if (currentPseudo === 'Zaès') {
         if(forgeTab) forgeTab.classList.remove('hidden-tab');
         if(enchantTab) enchantTab.classList.remove('hidden-tab');
         if(adminTab) adminTab.style.display = 'flex';
-        
+
         // Show/Hide impersonation banner
         const banner = document.getElementById('impersonation-banner');
         if (impersonateUid) {
@@ -1688,8 +1703,18 @@ function finishAppBoot() {
         } else {
             banner.style.display = 'none';
         }
-        
-        if (!impersonateUid) switchTab('calc'); 
+
+        if (!impersonateUid) switchTab('calc');
+    } else if (currentRole === 'visiteur') {
+        // Visitors can see everything except admin, but in read-only mode
+        if(forgeTab) forgeTab.classList.remove('hidden-tab');
+        if(enchantTab) enchantTab.classList.remove('hidden-tab');
+        if(visitorBanner) {
+            visitorBanner.style.display = 'flex';
+            updateVisitorDaysLeft();
+        }
+        applyVisitorReadOnly();
+        switchTab('calc');
     } else if (currentRole === 'enchant') {
         if(enchantTab) enchantTab.classList.remove('hidden-tab');
         switchTab('enchantement');
@@ -1721,6 +1746,103 @@ function finishAppBoot() {
 }
 
 // ========================
+// VISITOR LOGIC
+// ========================
+
+function isVisitor() {
+    return currentRole === 'visiteur';
+}
+
+function visitorGuard() {
+    if (isVisitor()) {
+        showToast("Mode visiteur : modification non autorisée", "🔒");
+        return true;
+    }
+    return false;
+}
+
+function applyVisitorReadOnly() {
+    // Hide all modification buttons
+    document.querySelectorAll('#calc-add-line, [onclick*="openNoteModal"], [onclick*="openVenteModal"], [onclick*="saveNote"], [onclick*="saveVenteItem"]').forEach(el => {
+        el.style.display = 'none';
+    });
+
+    // Hide note/vente action buttons (add, edit, delete)
+    const venteAddBtn = document.querySelector('#section-vente .notes-header .btn-gold');
+    if (venteAddBtn) venteAddBtn.style.display = 'none';
+
+    const noteAddBtn = document.querySelector('#section-notes .notes-header .btn-gold');
+    if (noteAddBtn) noteAddBtn.style.display = 'none';
+
+    // Add visitor-readonly class to body for CSS-based hiding
+    document.body.classList.add('visitor-readonly');
+}
+
+function removeVisitorReadOnly() {
+    document.body.classList.remove('visitor-readonly');
+    // Restore hidden buttons
+    document.querySelectorAll('#calc-add-line, [onclick*="openNoteModal"], [onclick*="openVenteModal"]').forEach(el => {
+        el.style.display = '';
+    });
+    const venteAddBtn = document.querySelector('#section-vente .notes-header .btn-gold');
+    if (venteAddBtn) venteAddBtn.style.display = '';
+    const noteAddBtn = document.querySelector('#section-notes .notes-header .btn-gold');
+    if (noteAddBtn) noteAddBtn.style.display = '';
+}
+
+function updateVisitorDaysLeft() {
+    if (!currentUser || !db) return;
+    db.collection('users').doc(currentUser.uid).get().then(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        if (data.createdAt) {
+            const created = data.createdAt.toDate();
+            const expiry = new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
+            const now = new Date();
+            const diffMs = expiry - now;
+            const daysLeft = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+            const el = document.getElementById('visitor-days-left');
+            if (el) el.textContent = daysLeft;
+
+            if (daysLeft <= 0) {
+                showToast("Votre compte visiteur a expiré. Déconnexion...", "⏰");
+                setTimeout(() => auth.signOut(), 2000);
+            }
+        }
+    });
+}
+
+function cleanupExpiredVisitors() {
+    if (!db || currentPseudo !== 'Zaès') return;
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+
+    db.collection('users').where('role', '==', 'visiteur').get().then(snap => {
+        snap.forEach(doc => {
+            const data = doc.data();
+            if (data.createdAt && data.createdAt.toDate() < fiveDaysAgo) {
+                const uid = doc.id;
+                const pseudo = data.pseudo;
+                // Archive to visitor_history before deleting
+                db.collection('visitor_history').add({
+                    pseudo: pseudo,
+                    createdAt: data.createdAt,
+                    expiredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    uid: uid,
+                    status: 'expiré'
+                }).then(() => {
+                    // Delete user data then profile
+                    db.collection('users').doc(uid).collection('data').doc('store').delete().then(() => {
+                        return db.collection('users').doc(uid).delete();
+                    }).then(() => {
+                        addActivityLog('Auto-Suppression Visiteur', `Compte expiré: ${pseudo}`);
+                    });
+                });
+            }
+        });
+    });
+}
+
+// ========================
 // AUTHENTICATION LOGIC
 // ========================
 function switchAuthMode(mode) {
@@ -1737,6 +1859,8 @@ function selectRole(role) {
     document.querySelectorAll('.role-option').forEach(el => el.classList.remove('active'));
     document.querySelector(`.role-option[data-role="${role}"]`).classList.add('active');
     document.getElementById('register-role').value = role;
+    const notice = document.getElementById('visitor-notice');
+    if (notice) notice.style.display = role === 'visiteur' ? 'block' : 'none';
 }
 
 function handleLogin() {
@@ -1788,11 +1912,23 @@ function handleRegister() {
     
     auth.createUserWithEmailAndPassword(email, password)
     .then(cred => {
-        return db.collection('users').doc(cred.user.uid).set({
+        const userData = {
             pseudo: pseudo,
             role: role,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        const promises = [db.collection('users').doc(cred.user.uid).set(userData)];
+        // Archive visitor in history on creation
+        if (role === 'visiteur') {
+            promises.push(db.collection('visitor_history').add({
+                pseudo: pseudo,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiredAt: null,
+                uid: cred.user.uid,
+                status: 'actif'
+            }));
+        }
+        return Promise.all(promises);
     })
     .catch(error => {
         console.error("Register Error:", error);
@@ -1839,7 +1975,7 @@ function loadAdminUsers() {
             
             tr.innerHTML = `
                 <td style="font-weight:600; color:var(--gold)">${u.pseudo}${isSelf ? ' <small>(Vous)</small>' : ''}</td>
-                <td>${u.role === 'enchant' ? '✨ Enchanteur' : '⚡ Forgeron'}</td>
+                <td>${u.role === 'enchant' ? '✨ Enchanteur' : u.role === 'visiteur' ? '👁️ Visiteur' : '⚡ Forgeron'}</td>
                 <td style="font-family:monospace; opacity:0.6; font-size:0.75rem">${uid}</td>
                 <td>
                     <div class="actions">
@@ -1946,6 +2082,65 @@ function stopImpersonating() {
     });
 }
 
+// --- VISITOR HISTORY ---
+
+function loadVisitorHistory() {
+    const listEl = document.getElementById('admin-visitor-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem;">⏳ Chargement de l\'historique des visiteurs...</td></tr>';
+
+    db.collection('visitor_history')
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get()
+        .then(snap => {
+            listEl.innerHTML = '';
+            if (snap.empty) {
+                listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem; opacity: 0.5;">Aucun visiteur enregistré.</td></tr>';
+                return;
+            }
+
+            snap.forEach(doc => {
+                const v = doc.data();
+                const tr = document.createElement('tr');
+
+                let createdStr = '—';
+                if (v.createdAt) {
+                    createdStr = v.createdAt.toDate().toLocaleString('fr-FR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+
+                let expiryStr = '—';
+                if (v.createdAt) {
+                    const expiry = new Date(v.createdAt.toDate().getTime() + 5 * 24 * 60 * 60 * 1000);
+                    expiryStr = expiry.toLocaleString('fr-FR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+
+                const statusLabel = v.status === 'actif'
+                    ? '<span class="tag tag-encours" style="font-size:0.7rem">Actif</span>'
+                    : '<span class="tag tag-termine" style="font-size:0.7rem">Expiré</span>';
+
+                tr.innerHTML = `
+                    <td style="font-weight:600; color:var(--gold)">${v.pseudo}</td>
+                    <td style="font-size:0.85rem">${createdStr}</td>
+                    <td style="font-size:0.85rem">${expiryStr}</td>
+                    <td>${statusLabel}</td>
+                `;
+                listEl.appendChild(tr);
+            });
+        })
+        .catch(err => {
+            console.error("Error loading visitor history:", err);
+            listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--accent-red)">Erreur de chargement.</td></tr>';
+        });
+}
+
 // --- NOUVELLES FONCTIONS LOGGING ---
 
 function addActivityLog(action, details) {
@@ -2042,6 +2237,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 initVenteDataIfEmpty();
                             }
                             addActivityLog('Connexion', 'Session démarrée');
+                            // Cleanup expired visitors on admin login
+                            cleanupExpiredVisitors();
                             finishAppBoot();
                         }).catch(e => {
                             console.error(e);
