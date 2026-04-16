@@ -1232,6 +1232,162 @@ textarea { resize: vertical; min-height: 100px; font-weight: 400; line-height: 1
     display: none !important;
 }
 
+/* ========== PENDING APPROVAL ========== */
+
+.pending-icon {
+    text-align: center;
+    font-size: 4rem;
+    margin: 1rem 0;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.pending-title {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 1.4rem;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.pending-text {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    padding: 1rem;
+    background: rgba(212, 160, 74, 0.05);
+    border: 1px dashed rgba(212, 160, 74, 0.2);
+    border-radius: var(--radius-sm);
+}
+
+/* ========== ADMIN PENDING BADGE ========== */
+
+.nav-badge {
+    margin-left: auto;
+    background: var(--accent-red);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 700;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+    animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
+    50% { box-shadow: 0 0 16px rgba(248, 113, 113, 0.9); }
+}
+
+/* ========== WHITELIST ========== */
+
+.whitelist-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.whitelist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(212, 160, 74, 0.1);
+    border: 1px solid rgba(212, 160, 74, 0.3);
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gold);
+    transition: all var(--transition);
+}
+
+.whitelist-chip:hover {
+    background: rgba(212, 160, 74, 0.2);
+    border-color: var(--gold);
+}
+
+.whitelist-pseudo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+}
+
+.whitelist-remove {
+    background: transparent;
+    border: none;
+    color: var(--accent-red);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 50%;
+    transition: all 0.15s;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.whitelist-remove:hover {
+    background: rgba(248, 113, 113, 0.2);
+    transform: scale(1.2);
+}
+
+/* ========== VISITOR MODE ========== */
+
+.visitor-banner {
+    background: linear-gradient(90deg, #60a5fa, #93c5fd, #60a5fa);
+    color: #0c1a3a;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    margin: -2rem -2rem 2rem -2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.visitor-notice {
+    margin-top: 0.8rem;
+    padding: 0.7rem 1rem;
+    background: rgba(96, 165, 250, 0.12);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: var(--radius-sm);
+    color: var(--accent-blue);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Hide edit/delete buttons on notes and vente items in visitor mode */
+body.visitor-readonly .note-actions,
+body.visitor-readonly .vente-item .btn-danger,
+body.visitor-readonly .vente-item .btn-icon,
+body.visitor-readonly .smelt-price-input {
+    pointer-events: none;
+    opacity: 0.3;
+}
+
+body.visitor-readonly .smelt-price-input {
+    cursor: not-allowed;
+}
+
 /* Fix for nested nav-item icon center vertically */
 .nav-item {
     display: flex;
