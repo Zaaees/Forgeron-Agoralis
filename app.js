@@ -143,6 +143,8 @@ function switchTab(tabId) {
         loadAdminUsers();
         loadActivityLogs();
         loadVisitorHistory();
+        loadPendingUsers();
+        loadWhitelist();
         cleanupExpiredVisitors();
     }
 }
@@ -187,6 +189,9 @@ function copyValue(text) {
 function fmt(val) { 
     const fixed = (Math.max(0, val)).toFixed(2);
     return fixed.endsWith('.00') ? fixed.slice(0, -3) : fixed;
+}
+function normalizePseudo(pseudo) {
+    return pseudo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 function stackStr(qty) {
     qty = Math.floor(qty);
@@ -1704,6 +1709,9 @@ function finishAppBoot() {
             banner.style.display = 'none';
         }
 
+        // Refresh pending users badge
+        refreshPendingBadge();
+
         if (!impersonateUid) switchTab('calc');
     } else if (currentRole === 'visiteur') {
         // Visitors can see everything except admin, but in read-only mode
@@ -1743,6 +1751,179 @@ function finishAppBoot() {
     
     const overlay = document.getElementById('loading-overlay');
     if (overlay) overlay.classList.remove('active');
+}
+
+// ========================
+// WHITELIST & APPROVAL LOGIC
+// ========================
+
+function loadWhitelist() {
+    const listEl = document.getElementById('whitelist-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<div class="note-empty" style="padding:1.5rem;">⏳ Chargement...</div>';
+
+    db.collection('whitelist').get().then(snap => {
+        listEl.innerHTML = '';
+        if (snap.empty) {
+            listEl.innerHTML = '<div class="note-empty" style="padding:1.5rem;">Aucun pseudo en whitelist.</div>';
+            return;
+        }
+        snap.forEach(doc => {
+            const data = doc.data();
+            const pseudoDisplay = data.pseudo || doc.id;
+            const chip = document.createElement('div');
+            chip.className = 'whitelist-chip';
+            chip.innerHTML = `
+                <span class="whitelist-pseudo">${pseudoDisplay}</span>
+                <button class="whitelist-remove" onclick="removeFromWhitelist('${doc.id}', '${pseudoDisplay}')" title="Retirer de la whitelist">✕</button>
+            `;
+            listEl.appendChild(chip);
+        });
+    }).catch(err => {
+        console.error("Error loading whitelist:", err);
+        listEl.innerHTML = '<div class="note-empty" style="padding:1.5rem; color:var(--accent-red);">Erreur de chargement.</div>';
+    });
+}
+
+function addToWhitelist() {
+    const input = document.getElementById('whitelist-input');
+    if (!input) return;
+    const pseudo = input.value.trim();
+    if (!pseudo) { showToast("Entrez un pseudo", "⚠️"); return; }
+    if (!pseudo.match(/^[a-zA-ZÀ-ÿ0-9_-]{3,16}$/)) {
+        showToast("Pseudo invalide (3-16 caractères)", "⚠️");
+        return;
+    }
+
+    const key = normalizePseudo(pseudo);
+    db.collection('whitelist').doc(key).set({
+        pseudo: pseudo,
+        addedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        input.value = '';
+        addActivityLog('Ajout Whitelist', pseudo);
+        showToast(`${pseudo} ajouté à la whitelist`, "✅");
+        loadWhitelist();
+    }).catch(err => {
+        console.error(err);
+        showToast("Erreur lors de l'ajout", "❌");
+    });
+}
+
+function removeFromWhitelist(key, pseudo) {
+    if (!confirm(`Retirer ${pseudo} de la whitelist ?`)) return;
+    db.collection('whitelist').doc(key).delete().then(() => {
+        addActivityLog('Retrait Whitelist', pseudo);
+        showToast(`${pseudo} retiré de la whitelist`, "🗑️");
+        loadWhitelist();
+    }).catch(err => {
+        console.error(err);
+        showToast("Erreur lors de la suppression", "❌");
+    });
+}
+
+function loadPendingUsers() {
+    const listEl = document.getElementById('admin-pending-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem;">⏳ Chargement...</td></tr>';
+
+    db.collection('users').where('status', '==', 'pending').get().then(snap => {
+        listEl.innerHTML = '';
+        const countLabel = document.getElementById('pending-count-label');
+        if (snap.empty) {
+            listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem; opacity: 0.5;">Aucune demande en attente.</td></tr>';
+            if (countLabel) countLabel.textContent = '';
+            updatePendingBadge(0);
+            return;
+        }
+
+        if (countLabel) countLabel.textContent = `(${snap.size})`;
+        updatePendingBadge(snap.size);
+
+        snap.forEach(doc => {
+            const u = doc.data();
+            const uid = doc.id;
+            const tr = document.createElement('tr');
+
+            let dateStr = '—';
+            if (u.createdAt) {
+                dateStr = u.createdAt.toDate().toLocaleString('fr-FR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            }
+
+            const roleLabel = u.role === 'enchant' ? '✨ Enchanteur' : (u.role === 'forge' ? '⚡ Forgeron' : u.role);
+
+            tr.innerHTML = `
+                <td style="font-weight:600; color:var(--gold)">${u.pseudo}</td>
+                <td>${roleLabel}</td>
+                <td style="font-size:0.85rem">${dateStr}</td>
+                <td>
+                    <div class="actions">
+                        <button class="btn btn-icon" style="background:var(--accent-green); color:white; border:none;" onclick="approveUser('${uid}', '${u.pseudo}')" title="Approuver">✅</button>
+                        <button class="btn btn-icon" style="background:var(--accent-red); color:white; border:none;" onclick="rejectUser('${uid}', '${u.pseudo}')" title="Rejeter et supprimer">❌</button>
+                    </div>
+                </td>
+            `;
+            listEl.appendChild(tr);
+        });
+    }).catch(err => {
+        console.error("Error loading pending users:", err);
+        listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--accent-red)">Erreur de chargement.</td></tr>';
+    });
+}
+
+function approveUser(uid, pseudo) {
+    if (!confirm(`Approuver le compte de ${pseudo} ?`)) return;
+    db.collection('users').doc(uid).update({
+        status: 'approved',
+        approvedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        addActivityLog('Approbation Compte', pseudo);
+        showToast(`${pseudo} approuvé`, "✅");
+        loadPendingUsers();
+        loadAdminUsers();
+    }).catch(err => {
+        console.error(err);
+        showToast("Erreur lors de l'approbation", "❌");
+    });
+}
+
+function rejectUser(uid, pseudo) {
+    if (!confirm(`Rejeter et SUPPRIMER définitivement la demande de ${pseudo} ?`)) return;
+    // Delete user data then profile (Firebase Auth user remains but orphan)
+    db.collection('users').doc(uid).collection('data').doc('store').delete().catch(() => {}).then(() => {
+        return db.collection('users').doc(uid).delete();
+    }).then(() => {
+        addActivityLog('Rejet Compte', pseudo);
+        showToast(`${pseudo} rejeté`, "🗑️");
+        loadPendingUsers();
+        loadAdminUsers();
+    }).catch(err => {
+        console.error(err);
+        showToast("Erreur lors du rejet", "❌");
+    });
+}
+
+function updatePendingBadge(count) {
+    const badge = document.getElementById('admin-pending-badge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function refreshPendingBadge() {
+    if (currentPseudo !== 'Zaès' || !db) return;
+    db.collection('users').where('status', '==', 'pending').get().then(snap => {
+        updatePendingBadge(snap.size);
+    }).catch(() => {});
 }
 
 // ========================
@@ -1846,13 +2027,28 @@ function cleanupExpiredVisitors() {
 // AUTHENTICATION LOGIC
 // ========================
 function switchAuthMode(mode) {
+    const loginBox = document.getElementById('login-box');
+    const registerBox = document.getElementById('register-box');
+    const pendingBox = document.getElementById('pending-box');
+    loginBox.classList.add('hidden');
+    registerBox.classList.add('hidden');
+    if (pendingBox) pendingBox.classList.add('hidden');
     if (mode === 'register') {
-        document.getElementById('login-box').classList.add('hidden');
-        document.getElementById('register-box').classList.remove('hidden');
+        registerBox.classList.remove('hidden');
+    } else if (mode === 'pending') {
+        if (pendingBox) pendingBox.classList.remove('hidden');
     } else {
-        document.getElementById('register-box').classList.add('hidden');
-        document.getElementById('login-box').classList.remove('hidden');
+        loginBox.classList.remove('hidden');
     }
+}
+
+function showPendingScreen(role) {
+    document.getElementById('auth-overlay').classList.add('active');
+    document.getElementById('app-wrapper').style.display = 'none';
+    const label = role === 'enchant' ? '✨ Enchanteur' : (role === 'forge' ? '⚡ Forgeron' : role);
+    const roleLabel = document.getElementById('pending-role-label');
+    if (roleLabel) roleLabel.textContent = label;
+    switchAuthMode('pending');
 }
 
 function selectRole(role) {
@@ -1910,32 +2106,52 @@ function handleRegister() {
     const email = cleanPseudo + "@agoralis.local";
     const password = pin + '00';
     
-    auth.createUserWithEmailAndPassword(email, password)
-    .then(cred => {
-        const userData = {
-            pseudo: pseudo,
-            role: role,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        const promises = [db.collection('users').doc(cred.user.uid).set(userData)];
-        // Archive visitor in history on creation
-        if (role === 'visiteur') {
-            promises.push(db.collection('visitor_history').add({
+    // Check if pseudo is whitelisted (auto-approve Forgeron/Enchanteur)
+    const whitelistKey = normalizePseudo(pseudo);
+    const isAdminPseudo = pseudo === 'Zaès';
+
+    db.collection('whitelist').doc(whitelistKey).get().then(wlDoc => {
+        const whitelisted = wlDoc.exists || isAdminPseudo;
+        // Visiteur = always approved. Forgeron/Enchanteur = approved only if whitelisted
+        const status = (role === 'visiteur' || whitelisted) ? 'approved' : 'pending';
+
+        auth.createUserWithEmailAndPassword(email, password)
+        .then(cred => {
+            const userData = {
                 pseudo: pseudo,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                expiredAt: null,
-                uid: cred.user.uid,
-                status: 'actif'
-            }));
-        }
-        return Promise.all(promises);
-    })
-    .catch(error => {
-        console.error("Register Error:", error);
-        alert("Erreur d'inscription : " + error.message);
-        let msg = "Erreur d'inscription";
-        if (error.code === 'auth/email-already-in-use') msg = "Ce pseudo est déjà utilisé";
-        showToast(msg, "❌");
+                role: role,
+                status: status,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            const promises = [db.collection('users').doc(cred.user.uid).set(userData)];
+            // Archive visitor in history on creation
+            if (role === 'visiteur') {
+                promises.push(db.collection('visitor_history').add({
+                    pseudo: pseudo,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    expiredAt: null,
+                    uid: cred.user.uid,
+                    status: 'actif'
+                }));
+            }
+            return Promise.all(promises).then(() => {
+                if (status === 'pending') {
+                    showToast("Inscription enregistrée — en attente de validation admin", "⏳");
+                }
+            });
+        })
+        .catch(error => {
+            console.error("Register Error:", error);
+            alert("Erreur d'inscription : " + error.message);
+            let msg = "Erreur d'inscription";
+            if (error.code === 'auth/email-already-in-use') msg = "Ce pseudo est déjà utilisé";
+            showToast(msg, "❌");
+            document.getElementById('btn-register').textContent = "S'inscrire";
+            document.getElementById('btn-register').disabled = false;
+        });
+    }).catch(error => {
+        console.error("Whitelist check error:", error);
+        showToast("Erreur lors de la vérification", "❌");
         document.getElementById('btn-register').textContent = "S'inscrire";
         document.getElementById('btn-register').disabled = false;
     });
@@ -1969,10 +2185,12 @@ function loadAdminUsers() {
         snap.forEach(doc => {
             const u = doc.data();
             const uid = doc.id;
+            // Skip pending users - they are displayed in a separate section
+            if (u.status === 'pending') return;
             const tr = document.createElement('tr');
-            
+
             const isSelf = uid === currentUser.uid;
-            
+
             tr.innerHTML = `
                 <td style="font-weight:600; color:var(--gold)">${u.pseudo}${isSelf ? ' <small>(Vous)</small>' : ''}</td>
                 <td>${u.role === 'enchant' ? '✨ Enchanteur' : u.role === 'visiteur' ? '👁️ Visiteur' : '⚡ Forgeron'}</td>
@@ -2218,6 +2436,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentRole = doc.data().role;
                         const pseudo = doc.data().pseudo;
                         currentPseudo = pseudo;
+                        const status = doc.data().status || 'approved'; // Legacy users without status = approved
+
+                        // Block pending users (except admin Zaès who bypasses all checks)
+                        if (status === 'pending' && pseudo !== 'Zaès') {
+                            if (overlay) overlay.classList.remove('active');
+                            showPendingScreen(currentRole);
+                            return;
+                        }
+
                         document.getElementById('logged-in-user').textContent = pseudo;
                         
                         db.collection('users').doc(user.uid).collection('data').doc('store').get().then(storeDoc => {
@@ -2257,6 +2484,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Logged out state
                 currentUser = null;
                 currentRole = null;
+                currentPseudo = null;
                 document.getElementById('app-wrapper').style.display = 'none';
                 document.getElementById('auth-overlay').classList.add('active');
                 document.getElementById('btn-login').textContent = "S'authentifier";
@@ -2264,6 +2492,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('btn-login').disabled = false;
                 document.getElementById('btn-register').disabled = false;
                 document.body.setAttribute('data-tab', 'auth');
+                // Reset to login box
+                switchAuthMode('login');
             }
         });
 
