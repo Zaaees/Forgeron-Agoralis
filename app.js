@@ -85,6 +85,7 @@ let xpCartLines = [];
 let currentUser = null;
 let currentRole = null;
 let currentPseudo = null;
+let registrationInProgress = false;
 
 let appData = {
     notes: [],
@@ -2026,6 +2027,58 @@ function cleanupExpiredVisitors() {
 // ========================
 // AUTHENTICATION LOGIC
 // ========================
+function handleAuthedUser(user) {
+    currentUser = user;
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.add('active');
+
+    db.collection('users').doc(user.uid).get().then(doc => {
+        if (doc.exists) {
+            currentRole = doc.data().role;
+            const pseudo = doc.data().pseudo;
+            currentPseudo = pseudo;
+            const status = doc.data().status || 'approved';
+
+            if (status === 'pending' && pseudo !== 'Zaès') {
+                if (overlay) overlay.classList.remove('active');
+                showPendingScreen(currentRole);
+                return;
+            }
+
+            document.getElementById('logged-in-user').textContent = pseudo;
+
+            db.collection('users').doc(user.uid).collection('data').doc('store').get().then(storeDoc => {
+                if (storeDoc.exists) {
+                    const data = storeDoc.data();
+                    appData.notes = data.notes || [];
+                    appData.vente = data.vente || [];
+                    appData.enchant_mult = data.enchant_mult || 1;
+                    appData.smelt_prices = data.smelt_prices || { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
+                } else {
+                    appData.vente = [];
+                    initVenteDataIfEmpty();
+                }
+                if (appData.vente.length === 0 || currentPseudo === 'Zaès') {
+                    initVenteDataIfEmpty();
+                }
+                addActivityLog('Connexion', 'Session démarrée');
+                cleanupExpiredVisitors();
+                finishAppBoot();
+            }).catch(e => {
+                console.error(e);
+                showToast("Erreur de lecture des données de l'utilisateur", "❌");
+            });
+        } else {
+            console.warn("User document not found for UID:", user.uid);
+            showToast("Profil utilisateur introuvable. Déconnexion...", "⚠️");
+            auth.signOut();
+        }
+    }).catch(e => {
+        console.error("Firestore get user error:", e);
+        showToast("Erreur de récupération du rôle", "❌");
+    });
+}
+
 function switchAuthMode(mode) {
     const loginBox = document.getElementById('login-box');
     const registerBox = document.getElementById('register-box');
@@ -2079,8 +2132,7 @@ function handleLogin() {
     })
     .catch(error => {
         console.error("Login Error:", error);
-        alert("Erreur de connexion : " + error.message);
-        showToast("Erreur: Pseudo ou PIN incorrect", "❌");
+        showToast("Pseudo ou PIN incorrect", "❌");
         document.getElementById('btn-login').textContent = "S'authentifier";
         document.getElementById('btn-login').disabled = false;
     });
@@ -2106,54 +2158,63 @@ function handleRegister() {
     const email = cleanPseudo + "@agoralis.local";
     const password = pin + '00';
     
-    // Check if pseudo is whitelisted (auto-approve Forgeron/Enchanteur)
     const whitelistKey = normalizePseudo(pseudo);
     const isAdminPseudo = pseudo === 'Zaès';
 
-    db.collection('whitelist').doc(whitelistKey).get().then(wlDoc => {
-        const whitelisted = wlDoc.exists || isAdminPseudo;
-        // Visiteur = always approved. Forgeron/Enchanteur = approved only if whitelisted
-        const status = (role === 'visiteur' || whitelisted) ? 'approved' : 'pending';
+    // Suppress onAuthStateChanged while we finish writing the user profile.
+    registrationInProgress = true;
 
-        auth.createUserWithEmailAndPassword(email, password)
-        .then(cred => {
-            const userData = {
-                pseudo: pseudo,
-                role: role,
-                status: status,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-            const promises = [db.collection('users').doc(cred.user.uid).set(userData)];
-            // Archive visitor in history on creation
-            if (role === 'visiteur') {
-                promises.push(db.collection('visitor_history').add({
+    auth.createUserWithEmailAndPassword(email, password)
+    .then(cred => {
+        // Read whitelist AFTER authentication so Firestore rules allow the read.
+        return db.collection('whitelist').doc(whitelistKey).get()
+            .catch(err => {
+                console.warn("Whitelist read failed, defaulting to not-whitelisted:", err);
+                return { exists: false };
+            })
+            .then(wlDoc => {
+                const whitelisted = wlDoc.exists || isAdminPseudo;
+                const status = (role === 'visiteur' || whitelisted) ? 'approved' : 'pending';
+
+                const userData = {
                     pseudo: pseudo,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    expiredAt: null,
-                    uid: cred.user.uid,
-                    status: 'actif'
-                }));
-            }
-            return Promise.all(promises).then(() => {
-                if (status === 'pending') {
-                    showToast("Inscription enregistrée — en attente de validation admin", "⏳");
+                    role: role,
+                    status: status,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                const promises = [db.collection('users').doc(cred.user.uid).set(userData)];
+                if (role === 'visiteur') {
+                    promises.push(db.collection('visitor_history').add({
+                        pseudo: pseudo,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        expiredAt: null,
+                        uid: cred.user.uid,
+                        status: 'actif'
+                    }));
                 }
+                return Promise.all(promises).then(() => {
+                    registrationInProgress = false;
+                    if (status === 'pending') {
+                        showToast("Inscription enregistrée — en attente de validation admin", "⏳");
+                    }
+                    // Profile doc now exists — trigger the normal authed flow.
+                    handleAuthedUser(cred.user);
+                });
             });
-        })
-        .catch(error => {
-            console.error("Register Error:", error);
-            alert("Erreur d'inscription : " + error.message);
-            let msg = "Erreur d'inscription";
-            if (error.code === 'auth/email-already-in-use') msg = "Ce pseudo est déjà utilisé";
-            showToast(msg, "❌");
-            document.getElementById('btn-register').textContent = "S'inscrire";
-            document.getElementById('btn-register').disabled = false;
-        });
-    }).catch(error => {
-        console.error("Whitelist check error:", error);
-        showToast("Erreur lors de la vérification", "❌");
+    })
+    .catch(error => {
+        registrationInProgress = false;
+        console.error("Register Error:", error);
+        let msg = "Erreur d'inscription";
+        if (error.code === 'auth/email-already-in-use') msg = "Ce pseudo est déjà utilisé";
+        showToast(msg, "❌");
         document.getElementById('btn-register').textContent = "S'inscrire";
         document.getElementById('btn-register').disabled = false;
+        // If the auth user was created but the Firestore write failed, roll back
+        // the auth account so the pseudo is not orphaned (user can retry).
+        if (auth.currentUser && error.code !== 'auth/email-already-in-use') {
+            auth.currentUser.delete().catch(() => auth.signOut());
+        }
     });
 }
 
@@ -2427,59 +2488,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Wait for Firebase to determine auth state
         auth.onAuthStateChanged(user => {
             if (user) {
-                currentUser = user;
-                const overlay = document.getElementById('loading-overlay');
-                if (overlay) overlay.classList.add('active');
-                
-                db.collection('users').doc(user.uid).get().then(doc => {
-                    if (doc.exists) {
-                        currentRole = doc.data().role;
-                        const pseudo = doc.data().pseudo;
-                        currentPseudo = pseudo;
-                        const status = doc.data().status || 'approved'; // Legacy users without status = approved
-
-                        // Block pending users (except admin Zaès who bypasses all checks)
-                        if (status === 'pending' && pseudo !== 'Zaès') {
-                            if (overlay) overlay.classList.remove('active');
-                            showPendingScreen(currentRole);
-                            return;
-                        }
-
-                        document.getElementById('logged-in-user').textContent = pseudo;
-                        
-                        db.collection('users').doc(user.uid).collection('data').doc('store').get().then(storeDoc => {
-                            if (storeDoc.exists) {
-                                const data = storeDoc.data();
-                                appData.notes = data.notes || [];
-                                appData.vente = data.vente || [];
-                                appData.enchant_mult = data.enchant_mult || 1;
-                                appData.smelt_prices = data.smelt_prices || { Or: 2.12, Fer: 1.79, Cuivre: 1.30 };
-                            } else {
-                                // Default catalogue auto-generation on first login
-                                appData.vente = [];
-                                initVenteDataIfEmpty();
-                            }
-                            // Si c'est l'admin ou si le catalogue est vide, on initialise/vérifie les données
-                            if (appData.vente.length === 0 || currentPseudo === 'Zaès') {
-                                initVenteDataIfEmpty();
-                            }
-                            addActivityLog('Connexion', 'Session démarrée');
-                            // Cleanup expired visitors on admin login
-                            cleanupExpiredVisitors();
-                            finishAppBoot();
-                        }).catch(e => {
-                            console.error(e);
-                            showToast("Erreur de lecture des données de l'utilisateur", "❌");
-                        });
-                    } else {
-                        console.warn("User document not found for UID:", user.uid);
-                        showToast("Profil utilisateur introuvable. Déconnexion...", "⚠️");
-                        auth.signOut();
-                    }
-                }).catch(e => {
-                    console.error("Firestore get user error:", e);
-                    showToast("Erreur de récupération du rôle", "❌");
-                });
+                // Skip while handleRegister is still writing the user doc —
+                // it will call handleAuthedUser itself once the write lands.
+                if (registrationInProgress) return;
+                handleAuthedUser(user);
             } else {
                 // Logged out state
                 currentUser = null;
