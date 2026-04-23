@@ -87,12 +87,35 @@
                         <div class="role-icon">⚡</div>
                         <div class="role-name">Forgeron</div>
                     </div>
+                    <div class="role-option" data-role="visiteur" onclick="selectRole('visiteur')">
+                        <div class="role-icon">👁️</div>
+                        <div class="role-name">Visiteur</div>
+                    </div>
+                </div>
+                <div class="visitor-notice" id="visitor-notice" style="display:none;">
+                    <span>👁️</span> Compte visiteur : accès en lecture seule, supprimé automatiquement après 5 jours.
                 </div>
                 <input type="hidden" id="register-role" value="">
             </div>
             
             <button class="btn btn-gold" style="width: 100%; padding: 1rem; margin-top: 1rem; font-size: 1.1rem; justify-content: center;" onclick="handleRegister()" id="btn-register">S'inscrire</button>
             <div class="auth-switch">Déjà Forgeron ou Enchanteur ? <a href="#" onclick="switchAuthMode('login')">Se connecter</a></div>
+        </div>
+
+        <!-- PENDING APPROVAL BOX -->
+        <div class="auth-box hidden" id="pending-box">
+            <div class="sidebar-logo" style="text-align: center; margin-bottom: 1.5rem;">
+                <h1 style="font-size: 2.2rem; justify-content: center;">⚜ Agoralis</h1>
+                <div class="tagline">En attente de validation</div>
+            </div>
+            <div class="pending-icon">⏳</div>
+            <div class="pending-title">Compte en attente de validation</div>
+            <div class="pending-text">
+                Votre inscription en tant que <strong id="pending-role-label">-</strong> a bien été enregistrée.<br><br>
+                Un administrateur doit valider votre compte avant que vous puissiez accéder à l'application.<br><br>
+                Revenez plus tard ou contactez un administrateur.
+            </div>
+            <button class="btn btn-gold" style="width: 100%; padding: 1rem; margin-top: 1.5rem; font-size: 1.1rem; justify-content: center;" onclick="handleLogout()">🚪 Se déconnecter</button>
         </div>
     </div>
 
@@ -133,6 +156,7 @@
             <div class="nav-item id-admin-only" data-tab="admin" style="display:none; border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 1rem;">
                 <span class="nav-icon">👑</span>
                 <span class="nav-label">Administration</span>
+                <span class="nav-badge" id="admin-pending-badge" style="display:none;">0</span>
             </div>
             <div class="nav-item" id="nav-logout" onclick="handleLogout()" style="margin-top:auto; color:var(--accent-red)">
                 <span class="nav-icon">🚪</span>
@@ -194,6 +218,14 @@
 
     <!-- MAIN CONTENT -->
     <main class="main-content">
+        <!-- VISITOR BANNER -->
+        <div id="visitor-banner" class="visitor-banner" style="display:none;">
+            <div class="banner-content">
+                <span class="banner-icon">👁️</span>
+                <span>Mode Visiteur — Consultation uniquement. Votre compte expire dans <strong id="visitor-days-left">5</strong> jour(s).</span>
+            </div>
+        </div>
+
         <!-- IMPERSONATION BANNER -->
         <div id="impersonation-banner" class="impersonation-banner" style="display:none;">
             <div class="banner-content">
@@ -579,6 +611,45 @@
                 <p>Gérez les accès et surveillez l'activité des joueurs</p>
             </div>
 
+            <!-- PENDING USERS -->
+            <div class="card" style="margin-bottom: 2rem; border-color: rgba(251,146,60,0.3);">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+                    <div class="card-title" style="margin-bottom:0">⏳ Demandes en attente <span id="pending-count-label" style="color:var(--accent-orange); font-size:1rem; margin-left:0.5rem;"></span></div>
+                    <button class="btn btn-sm" onclick="loadPendingUsers()">🔄 Actualiser</button>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Pseudo</th>
+                                <th>Rôle demandé</th>
+                                <th>Date de demande</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-pending-list">
+                            <tr><td colspan="4" style="text-align:center; padding: 2rem; opacity: 0.5;">Cliquez sur Actualiser pour charger les demandes.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- WHITELIST MANAGEMENT -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+                    <div class="card-title" style="margin-bottom:0">📜 Whitelist (Approbation automatique)</div>
+                    <button class="btn btn-sm" onclick="loadWhitelist()">🔄 Actualiser</button>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.9rem; font-style:italic; margin-bottom:1rem;">Les pseudos de cette liste sont automatiquement validés à l'inscription (Forgeron & Enchanteur).</p>
+                <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+                    <input type="text" id="whitelist-input" placeholder="Pseudo à ajouter..." style="flex:1;" onkeydown="if(event.key==='Enter')addToWhitelist()">
+                    <button class="btn btn-gold" onclick="addToWhitelist()">➕ Ajouter</button>
+                </div>
+                <div id="whitelist-list" class="whitelist-grid">
+                    <div class="note-empty" style="padding:1.5rem;">Cliquez sur Actualiser pour charger la whitelist.</div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
                     <div class="card-title" style="margin-bottom:0">Joueurs Inscrits</div>
@@ -596,6 +667,28 @@
                         </thead>
                         <tbody id="admin-user-list">
                             <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 2rem;">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.5rem;">
+                    <div class="card-title" style="margin-bottom:0">👁️ Historique des Visiteurs</div>
+                    <button class="btn btn-sm" onclick="loadVisitorHistory()">🔄 Actualiser</button>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Pseudo</th>
+                                <th>Date d'inscription</th>
+                                <th>Expiration</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-visitor-list">
+                            <tr><td colspan="4" style="text-align:center; padding: 2rem; opacity: 0.5;">Cliquez sur Actualiser pour charger l'historique des visiteurs.</td></tr>
                         </tbody>
                     </table>
                 </div>
