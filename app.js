@@ -148,16 +148,37 @@ function switchTab(tabId) {
 // ========================
 // THEME
 // ========================
+const AVAILABLE_THEMES = ['dark', 'light', 'nether', 'emerald', 'amethyst'];
+
 function initTheme() {
     const saved = localStorage.getItem(STORAGE_KEYS.theme);
-    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    if (saved && AVAILABLE_THEMES.includes(saved)) {
+        document.documentElement.setAttribute('data-theme', saved);
+    }
+    syncThemeUI();
 }
 
-function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem(STORAGE_KEYS.theme, next);
+function setTheme(themeName) {
+    if (!AVAILABLE_THEMES.includes(themeName)) return;
+    document.documentElement.setAttribute('data-theme', themeName);
+    localStorage.setItem(STORAGE_KEYS.theme, themeName);
+    syncThemeUI();
+    // Close panel after selection
+    const panel = document.getElementById('theme-selector-panel');
+    if (panel) panel.classList.remove('active');
+    showToast(`Thème "${themeName}" appliqué !`, '🎨');
+}
+
+function toggleThemePanel() {
+    const panel = document.getElementById('theme-selector-panel');
+    if (panel) panel.classList.toggle('active');
+}
+
+function syncThemeUI() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    document.querySelectorAll('.theme-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.themeValue === current);
+    });
 }
 
 // ========================
@@ -1207,6 +1228,13 @@ function closeTimerModal() {
     if (m) m.classList.remove('active');
 }
 
+function restartTimer15() {
+    currentTimerDuration = 15 * 60;
+    timerRemaining = currentTimerDuration;
+    closeTimerModal();
+    startTimer();
+}
+
 // ========================
 // NOTES MODULE
 // ========================
@@ -1593,8 +1621,17 @@ function initAppListeners() {
         });
     });
     
-    // Theme toggle
-    document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+    // Theme toggle (opens panel)
+    document.getElementById('theme-toggle')?.addEventListener('click', toggleThemePanel);
+    
+    // Close theme panel on outside click
+    document.addEventListener('click', (e) => {
+        const panel = document.getElementById('theme-selector-panel');
+        const toggle = document.getElementById('theme-toggle');
+        if (panel && panel.classList.contains('active') && !panel.contains(e.target) && !toggle.contains(e.target)) {
+            panel.classList.remove('active');
+        }
+    });
     
     // Calculator & Forge inputs
     ['calc-unit', 'calc-qty', 'calc-budget'].forEach(id => {
@@ -1623,7 +1660,11 @@ function initAppListeners() {
         if (e.target.id === 'vente-modal') closeVenteModal();
     });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { closeNoteModal(); closeVenteModal(); }
+        if (e.key === 'Escape') {
+            closeNoteModal(); closeVenteModal();
+            const themePanel = document.getElementById('theme-selector-panel');
+            if (themePanel) themePanel.classList.remove('active');
+        }
     });
     
     buildVenteEmojiPicker();
