@@ -11,3 +11,6 @@
 - [x] Task: Implement the logic to cap total stacks at 15 and optimize material mix.
 - [x] Task: Verify all tests pass and coverage is >80%. (Skipped: No test framework)
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Logic Implementation' (Protocol in workflow.md)
+
+## Phase: Review Fixes
+- [x] Task: Apply review suggestions 85f3956
