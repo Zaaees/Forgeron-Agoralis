@@ -631,6 +631,9 @@ function calcAnvilWear() {
 // ========================
 const ITEMS_PER_FURNACE = 64; // 1 stack per blast furnace per batch
 
+/**
+ * Calculates the optimal mix of items for smelting based on budget and constraints.
+ */
 function calcSmelt() {
     const checked = Array.from(document.querySelectorAll('input[name="smelt-mat"]:checked'));
     const maxBudget = parseFloat(document.getElementById('smelt-budget').value) || 0;
@@ -668,6 +671,13 @@ function calcSmelt() {
     let bestTotalStacks = 0;
     let bestScore = -1; // Le score combine revenu et priorité
 
+    /**
+     * Recursive solver for finding the best item combination.
+     * @param {number} idx Current item index
+     * @param {number} currentBudget Remaining budget
+     * @param {Object} currentCombo Current combination of items
+     * @param {number} currentTotalStacks Current total number of stacks
+     */
     function solve(idx, currentBudget, currentCombo, currentTotalStacks) {
         if (idx === items.length) {
             const revenue = maxBudget - currentBudget;
@@ -699,7 +709,10 @@ function calcSmelt() {
         for (let s = maxStacks; s >= 0; s--) {
             currentCombo[item.name] = s;
             solve(idx + 1, currentBudget - (s * item.stackPrice), currentCombo, currentTotalStacks + s);
-            if (bestRevenue === maxBudget && (!isLimit15 || currentTotalStacks + s === 15)) break; 
+            
+            if (bestRevenue === maxBudget) {
+                break;
+            }
         }
     }
 

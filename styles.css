@@ -339,17 +339,17 @@ body {
 .form-row .form-group { flex: 1; }
 
 .smelt-limit-group { margin-top: 1rem; }
-.smelt-limit-label {
-    display: flex !important;
+.form-group .smelt-limit-label {
+    display: flex;
     align-items: center;
     gap: 0.6rem;
     cursor: pointer;
-    text-transform: none !important;
-    font-size: 0.95rem !important;
-    color: var(--text-main) !important;
-    font-weight: 500 !important;
+    text-transform: none;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    font-weight: 500;
 }
-.smelt-limit-label input[type="checkbox"] {
+.form-group .smelt-limit-label input[type="checkbox"] {
     width: 1.2rem;
     height: 1.2rem;
     margin: 0;
