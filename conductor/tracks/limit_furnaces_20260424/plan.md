@@ -1,9 +1,9 @@
 # Implementation Plan: Limit Smelting Optimization to 15 Blast Furnaces
 
-## Phase 1: UI Implementation
+## Phase 1: UI Implementation [checkpoint: 873de59]
 - [x] Task: Add the "Limiter à 15 Hauts Fourneaux" checkbox in `index.html`.
 - [x] Task: Update `styles.css` for proper checkbox alignment in the smelting section.
-- [~] Task: Conductor - User Manual Verification 'Phase 1: UI Implementation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: UI Implementation' (Protocol in workflow.md)
 
 ## Phase 2: Logic Implementation
 - [ ] Task: Create a failing test for `calcSmelt` with the 15-furnace limit active.
