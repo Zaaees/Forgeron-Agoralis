@@ -488,6 +488,13 @@
                     <div class="form-group">
                         <label>Objectif de revenu (€) (Budget Max)</label>
                         <input type="number" id="smelt-budget" min="1" value="1000" step="1" placeholder="Ex: 1000€" onchange="calcSmelt()" oninput="calcSmelt()">
+                        
+                        <div class="smelt-limit-group">
+                            <label class="smelt-limit-label">
+                                <input type="checkbox" id="smelt-limit-15" onchange="calcSmelt()">
+                                Limiter à 15 Hauts Fourneaux
+                            </label>
+                        </div>
                     </div>
                 </div>
 
