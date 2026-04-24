@@ -634,6 +634,7 @@ const ITEMS_PER_FURNACE = 64; // 1 stack per blast furnace per batch
 function calcSmelt() {
     const checked = Array.from(document.querySelectorAll('input[name="smelt-mat"]:checked'));
     const maxBudget = parseFloat(document.getElementById('smelt-budget').value) || 0;
+    const isLimit15 = document.getElementById('smelt-limit-15')?.checked || false;
     
     if (checked.length === 0 || maxBudget <= 0) {
         document.getElementById('smelt-haut-result').textContent = '0';
@@ -688,14 +689,17 @@ function calcSmelt() {
         }
 
         const item = items[idx];
-        const maxStacks = Math.floor(currentBudget / item.stackPrice);
+        let maxStacks = Math.floor(currentBudget / item.stackPrice);
+        if (isLimit15) {
+            maxStacks = Math.min(maxStacks, 15 - currentTotalStacks);
+        }
         
         // On teste toutes les possibilités pour ce matériau
         // Optimisation : si on a déjà un revenu parfait (0€ de reste), on s'arrête
         for (let s = maxStacks; s >= 0; s--) {
             currentCombo[item.name] = s;
             solve(idx + 1, currentBudget - (s * item.stackPrice), currentCombo, currentTotalStacks + s);
-            if (bestRevenue === maxBudget) break; 
+            if (bestRevenue === maxBudget && (!isLimit15 || currentTotalStacks + s === 15)) break; 
         }
     }
 
@@ -710,7 +714,7 @@ function calcSmelt() {
     // Phase gloutonne standard (le score gérera la priorité pendant l'optimisation fine)
     items.sort((a, b) => b.stackPrice - a.stackPrice);
     
-    if (maxBudget > MAX_SEARCH_STACKS * items[0].stackPrice) {
+    if (maxBudget > MAX_SEARCH_STACKS * items[0].stackPrice && !isLimit15) {
         const item = items[0];
         const bulkyStacks = Math.floor(maxBudget / item.stackPrice) - MAX_SEARCH_STACKS;
         if (bulkyStacks > 0) {
